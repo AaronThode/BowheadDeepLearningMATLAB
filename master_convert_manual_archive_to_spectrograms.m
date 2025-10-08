@@ -19,9 +19,8 @@ output_dir='../Manual_sample_database.dir';
 if exist(GSI_file_dir)==0
     error('GSI_file_dir not present')
 end
-debug_plot=false;
 debug.sec_to_load=1*60*60;
-debug.Iday_start=2;
+debug.Iday_start=5;
 
 %write_files=true;
 
@@ -37,7 +36,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=60*60;  %seconds
+chunk_sample=0.5*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -47,6 +46,7 @@ param.event.image_scale_factor = 5;  % factor to multiply SNR by for saving as u
 param.event.fmin = 10;
 param.event.fmax = 475;
 
+param.spec.debug_plot=false;
 param.spec.Nfft=256;
 param.spec.ovlap=0.75;
 param.spec.image_scale_factor = param.event.image_scale_factor;
@@ -139,6 +139,7 @@ for Iyear=1:length(year_want)
                 disp(datestr(tabs_start_unique(Iday)));
 
                 Igood=find(tabs_start==tabs_start_unique(Iday));
+                fprintf('On this day there are %i manual detections.\n',length(Igood));
                 manual.tabs=tabs(Igood);
                 manual.tsec=(tabs(Igood)-tabs_start_unique(Iday))*24*3600;
                 manual.tsec=manual.tsec*(1+head.tdrift/86400);
@@ -179,11 +180,28 @@ for Iyear=1:length(year_want)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%Process and save all manual detections
                 
                 disp('Starting manual spectrograms')
-                Itemp=Igood;
-                sub_process_manual_detections;
-                clear Itemp
-                disp('Finished manual spectrograms')
                 
+                %Igood_org=Ipass(Igood);  %Ensure that we skipp the NaN..
+                %Itemp is associated with Igood, which is associated with tabs.
+                %Igood_org associated with original manual.ind.* fields
+
+                for I=1:length(Igood)
+                    tmid=manual.tmid(I);
+
+                    titstr{1}=sprintf('Manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Igood));
+                    titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s',manual.SNR(I),datestr(manual.tabs(I)));
+                   
+                    [SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                     output_name=GSI_names(Ifile_want).name(1:(end-4));
+                    temp=datestr(tabs(Igood(I)),30);
+                    output_name(17:end)=temp(10:end);
+                    output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep output_name '.mat'];
+                    save(output_name,'SNR_gram','FF','TT');
+                end %I in Igood
+                %sub_process_manual_detections;
+                %clear Itemp
+                disp('Finished manual spectrograms')
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%Energy Detector.m%%%%%%%
                 %%% Now generate false detections by a simple event
                 %%% detector and check that they aren't whale calls.
@@ -201,11 +219,11 @@ for Iyear=1:length(year_want)
                 param.energy.ovlap = 0.75;
                 param.energy.flo_det=25;
                 param.energy.fhi_det=450;
-                param.energy.burn_in_time=0.5;  %Time in minutes
-                param.energy.eq_time=10;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
+                param.energy.burn_in_time=0.25;  %Time in minutes
+                param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
                 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
                 param.energy.threshold=5;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
-                param.energy.TolTime=1e-4;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
+                param.energy.TolTime=0.5;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
                 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
                 param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
                 param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug information. 1:  SEL output.  2:  equalized background noise. 3: SNR.';K=K+1;
@@ -215,9 +233,12 @@ for Iyear=1:length(year_want)
                 for Ichunk=1:Nchunks
                      Iss=1+(Ichunk-1)*chunk_sample*head.Fs;
                      x_chunk=x(Iss:(Iss-1+chunk_sample*head.Fs));
+                     param.energy.debug=true;
                      [detect,debugg]=MultipleBandEnergyDetector(x_chunk,head.tabs_start+datenum(0,0,0,0,0,(Ichunk-1)*chunk_sample),param.energy);
                      detect.tstart=detect.tstart+(Ichunk-1)*chunk_sample;
                      detect.tend=detect.tend+(Ichunk-1)*chunk_sample;
+
+                     fprintf('There are %i automated detections in chunk %i which covers %i minutes.\n',length(detect.tend),Ichunk,chunk_sample/60 )
                      %detect.tmid_abs=0.5*(detect.tstart_abs+detect.tend_abs);
 
                       %%%Determine whether any overlap exists between
@@ -226,8 +247,7 @@ for Iyear=1:length(year_want)
                         
                      param.compare.ovlap=0.5;
                      [Score{Ichunk},Manual_index]=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
-                %end
-
+                
                      Idet_match=find(Score{Ichunk}>0);
                      Manual_index_match=Manual_index(Score{Ichunk}>0);
                      Imiss=setdiff(1:max(Manual_index_match),Manual_index_match);
@@ -235,48 +255,34 @@ for Iyear=1:length(year_want)
                      
 
                      %%%%%%Examine missed manual detections
-                     debug_plot=true;
-                     Itemp=Imiss;
+                     param.spec.debug_plot=true;
+                     %Itemp=Imiss;
                      disp('Displaying missed manual detections')
-                     sub_process_manual_detections;
+                    
+                     for I=1:length(Imiss)
+                         tmid=manual.tmid(Imiss(I));
 
+                         titstr{1}=sprintf('Missed manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Imiss));
+                         titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s',manual.SNR(Imiss(I)),datestr(manual.tabs(Imiss(I))));
+
+                         [SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                         
+                     end %I in Imiss
+
+                     %%%Display automated detections that match
                      for Idet=1:length(Idet_match)
 
                          II=Idet_match(Idet);
-                         
-                         Imid=round(head.Fs*0.5*(detect.tstart(II)+detect.tend(II)));
-                         Ixx=Imid+0.5*file_len_sec*head.Fs*[-1 1];
-                         
-                         Ixx(1)=max([1 (Ixx(1))]);
-                         Ixx(2)=min([length(x) Ixx(2)])-1;
-                         y=x(Ixx(1):Ixx(2));
-                         if length(y)~=head.Fs*file_len_sec
-                             disp('File length not right')
-                             continue
-                         end
-
-                         [SNR_gram,FF,TT]=create_normalized_spectrogram(y,head.Fs,spectrogram_len_sec,param.spec);
-                            
-                         if debug_plot
-                             figure(2);
-                             subplot(2,1,1)
-                             spectrogram((y),param.spec.Nfft,param.spec.Nfft/2,param.spec.Nfft,head.Fs,'yaxis')
-                             clim([0 30]);colorbar
-                             title(sprintf('Auto detect Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,Imid/head.Fs,Idet,length(Idet_match)))
-
-                             subplot(2,1,2)
-                             imagesc(TT,FF,SNR_gram);colorbar;axis xy
-                             title('Final SNR image')
-                             title(sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
-                                 detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II)));
-
-                             pause
-                         end
-
+                         tmid=0.5*(detect.tstart(II)+detect.tend(II));
+                         titstr{1}=sprintf('Auto detect Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,Imid/head.Fs,Idet,length(Idet_match));
+                         titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
+                                 detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));
+                         [SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+              
                      end %Idet
 
                 end %Ichunk
-               
+               debug_plot=false;
              
 
             end %Iday

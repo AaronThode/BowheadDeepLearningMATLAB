@@ -356,7 +356,7 @@ if params.debug
     subplot(4,1,3);hold off
     imagesc(TT,0.5*(flo+fhi),(debug.detect-debug.eq_history));axis('xy'); colorbar('westoutside')
     caxis([params.threshold + [0 30]]);
-    title('Detection Excess');
+    title('Detection Excess');colormap(jet)
     
     subplot(4,1,4);hold off
     imagesc(TT,0.5*(flo+fhi),debug.detection_status);axis('xy'); colorbar('westoutside')
