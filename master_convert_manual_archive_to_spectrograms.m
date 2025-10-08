@@ -20,6 +20,7 @@ if exist(GSI_file_dir)==0
     error('GSI_file_dir not present')
 end
 debug.sec_to_load=1*60*60;
+%debug.Iday_start=5;
 debug.Iday_start=5;
 
 %write_files=true;
@@ -36,7 +37,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=0.5*60*60;  %seconds
+chunk_sample=0.25*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -248,9 +249,11 @@ for Iyear=1:length(year_want)
                      param.compare.ovlap=0.5;
                      [Score{Ichunk},Manual_index]=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
                 
-                     Idet_match=find(Score{Ichunk}>0);
-                     Manual_index_match=Manual_index(Score{Ichunk}>0);
-                     Imiss=setdiff(1:max(Manual_index_match),Manual_index_match);
+                     Idet_match=find(Score{Ichunk}(:,1)>0);
+                     Manual_index_match=Manual_index(:);
+                     Manual_index_match=Manual_index_match(~isnan(Manual_index_match));
+                     
+                     Imiss=setdiff(min(Manual_index_match):max(Manual_index_match),Manual_index_match);
                      fprintf('%i out of %i (%6.2f percent) manual detections missing from automated detections\n',length(Imiss),max(Manual_index_match),100*length(Imiss)/max(Manual_index_match))
                      
 
@@ -270,11 +273,12 @@ for Iyear=1:length(year_want)
                      end %I in Imiss
 
                      %%%Display automated detections that match
+                     param.spec.debug_plot=false;
                      for Idet=1:length(Idet_match)
 
                          II=Idet_match(Idet);
                          tmid=0.5*(detect.tstart(II)+detect.tend(II));
-                         titstr{1}=sprintf('Auto detect Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,Imid/head.Fs,Idet,length(Idet_match));
+                         titstr{1}=sprintf('Auto detect Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,Idet,length(Idet_match));
                          titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
                                  detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));
                          [SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
@@ -282,6 +286,7 @@ for Iyear=1:length(year_want)
                      end %Idet
 
                 end %Ichunk
+                pause;
                debug_plot=false;
              
 

@@ -7,7 +7,7 @@ t1_e=t1_e(:);
 t2_s=t2_s(:);
 t2_e=t2_e(:);
 score=NaN(length(t2_s),1);
-manual_index=NaN(length(t2_s),1);
+manual_index=NaN(length(t2_s),3);
 for I=1:length(t1_s)
 
 
@@ -20,12 +20,18 @@ for I=1:length(t1_s)
     min_duration=min([repmat(duration_1(I),length(duration_2),1) duration_2],[],2);
     [frac_ovlap,Imax]=max((tmax-tmin)./min_duration);
     %score(Imax)=frac_ovlap>=ovlap;
+    if frac_ovlap<0
+        continue
+    end
     score(Imax)=frac_ovlap;
-    manual_index(Imax)=I;
-  %  if Imax==193
-  %      keyboard
-  %  end
-
+    if isnan(manual_index(Imax,1))
+        manual_index(Imax,1)=I;
+    elseif isnan(manual_index(Imax,2))
+        manual_index(Imax,2)=I;
+    else 
+        manual_index(Imax,3)=I;
+    end
+  
 
 end
-keyboard
+%keyboard
