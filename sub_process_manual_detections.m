@@ -29,6 +29,8 @@ for I=1:length(Igood)
         subplot(2,1,2)
         imagesc(TT,FF,SNR_gram);colorbar;axis xy
         title('Final SNR image')
+        title(sprintf('Final SNR image, SNR: %6.2f, abs start: %s',manual.SNR(I),datestr(manual.tabs(I))));
+
         pause(2)
     end
 

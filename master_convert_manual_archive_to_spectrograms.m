@@ -20,7 +20,7 @@ if exist(GSI_file_dir)==0
     error('GSI_file_dir not present')
 end
 debug_plot=false;
-debug.sec_to_load=Inf;
+debug.sec_to_load=1*60*60;
 
 %write_files=true;
 
@@ -104,11 +104,14 @@ for Iyear=1:length(year_want)
 
             Ipass=find(~isnan(tabs));
             tabs=tabs(Ipass);
+            SIG_all=manual.ind.sigdb(Ipass,Id);
+            SNR_all=manual.ind.stndb(Ipass,Id);
+               
             temp=datevec(tabs);
             temp(:,4:6)=0;
             tabs_start=datenum(temp);
             tabs_start_unique=unique(tabs_start);
-
+ 
             %%%Placeholder to read in clock drift information for GSI
             %%%file for this day...
            
@@ -141,7 +144,8 @@ for Iyear=1:length(year_want)
                 manual.duration=manual.ind.duration(Ipass(Igood),Id);
                 manual.tmid=manual.tsec+0.5*manual.duration;
                 manual.tend=manual.tsec+manual.duration;
-
+                manual.SNR=SNR_all(Igood);
+                manual.sig=SIG_all(Igood);
 
                 mydir=pwd;
                 cd(output_dir)
@@ -170,7 +174,7 @@ for Iyear=1:length(year_want)
                 toc
                 %x=int16(x-2^15);
                 x=x-2^15;
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%Process and save all manual detections
                 %if 1==0
                 disp('Starting manual spectrograms')
@@ -196,7 +200,7 @@ for Iyear=1:length(year_want)
                 param.energy.flo_det=25;
                 param.energy.fhi_det=350;
                 param.energy.burn_in_time=1;  %Time in minutes
-                param.energy.eq_time=10;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
+                param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
                 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
                 param.energy.threshold=10;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
                 param.energy.TolTime=1e-4;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
@@ -215,25 +219,23 @@ for Iyear=1:length(year_want)
                      %detect.tmid_abs=0.5*(detect.tstart_abs+detect.tend_abs);
 
                      param.compare.ovlap=0.5;
-                     Score{Ichunk}=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
-                end
+                     [Score{Ichunk},Manual_index]=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
+                %end
 
-                keyboard
-                     for Idet=1:length(detect.tstart)
+                     Idet_match=find(Score{Ichunk}>0);
+                     for Idet=1:length(Idet_match)
 
+                         II=Idet_match(Idet);
                          %%%Determine whether any overlap exists between
                          %%%manual detections and these detections.
                          %%%make comparisons in terms of absolute times.
                          %%% Any comparison needs to look at fraction of
                          %%% overlap between detections.
                          %Imatch=find((detect.tstart_abs(Idet)>=manual.tabs) & (detect.tstart_abs(Idet)<=(manual.tabs+datenum(0,0,0,0,0,manual.duration))));
-                         
-                         if ~isempty(Imatch)
-                             keyboard
-                         end
+                        
 
-                         continue
-                         Imid=round(head.Fs*0.5*(detect.tstart(Idet)+detect.tend(Idet)));
+                         
+                         Imid=round(head.Fs*0.5*(detect.tstart(II)+detect.tend(II)));
                          Ixx=Imid+0.5*file_len_sec*head.Fs*[-1 1];
                          
                          Ixx(1)=max([1 (Ixx(1))]);
@@ -245,10 +247,25 @@ for Iyear=1:length(year_want)
                          end
 
                          [SNR_gram,FF,TT]=create_normalized_spectrogram(y,head.Fs,spectrogram_len_sec,param.spec);
+                            debug_plot=true;
+                         if debug_plot
+                             figure(2);
+                             subplot(2,1,1)
+                             spectrogram((y),param.spec.Nfft,param.spec.Nfft/2,param.spec.Nfft,head.Fs,'yaxis')
+                             clim([0 30]);colorbar
+                             title(sprintf('Auto detect Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,Imid/head.Fs,Idet,length(Idet_match)))
+
+                             subplot(2,1,2)
+                             imagesc(TT,FF,SNR_gram);colorbar;axis xy
+                             title('Final SNR image')
+                             title(sprintf('Final SNR image, SNR: %6.2f, abs start: %s',detect.dB_RMS(II),datestr(detect.tstart_abs(II))));
+
+                             pause
+                         end
 
                      end
 
-                %end
+                end
                
              
 
