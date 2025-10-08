@@ -19,10 +19,10 @@ output_dir='../Manual_sample_database.dir';
 if exist(GSI_file_dir)==0
     error('GSI_file_dir not present')
 end
-debug_plot=true;
-debug.sec_to_load=60*60;
+debug_plot=false;
+debug.sec_to_load=Inf;
 
-write_files=true;
+%write_files=true;
 
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
@@ -32,6 +32,11 @@ Site={'5'};
 
 sound_type='whale'; %whale, seal
 
+%%%% Seconds of data to convert to spectrogram to conserve RAM memory.
+%%%%   Duration should be short enough that background noise not expected
+%%%%   to change...
+
+chunk_sample=60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -106,40 +111,20 @@ for Iyear=1:length(year_want)
 
             %%%Placeholder to read in clock drift information for GSI
             %%%file for this day...
-            %if write_files
-
-            if strcmpi(GSI_file_type,'gsi')
-                GSI_file_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
-                    GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
-                    Site{Isite},year_want{Iyear},strr(Id));
-                %fs=head.Fs*(1+head.tdrift/86400);
+           
+            GSI_file_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
+                GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
+                Site{Isite},year_want{Iyear},strr(Id));
+            %fs=head.Fs*(1+head.tdrift/86400);
+            if exist(GSI_file_want,'dir')~=7
+                GSI_file_want(end)='1';
                 if exist(GSI_file_want,'dir')~=7
-                    GSI_file_want(end)='1';
-                    if exist(GSI_file_want,'dir')~=7
-                        disp('Data do not exist')
-                        continue
-                    end
+                    disp('Data do not exist')
+                    continue
                 end
-                GSI_names=dir([GSI_file_want '/*gsi']);
-                head=readgsif_header([GSI_file_want filesep GSI_names(1).name]);
-
-            elseif strcmpi(GSI_file_type,'wav')
-                GSI_file_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0_WAV', ...
-                    GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
-                    Site{Isite},year_want{Iyear},strr(Id));
-                %fs=head.Fs*(1+head.tdrift/86400);
-                if exist(GSI_file_want,'dir')~=7
-                    GSI_file_want(end-5)='1';
-                    if exist(GSI_file_want,'dir')~=7
-                        disp('Data do not exist')
-                        continue
-                    end
-                end
-                GSI_names=dir([GSI_file_want '/S*WAV']);
             end
-            %else
-            %head.tdrift=0;
-            %end
+            GSI_names=dir([GSI_file_want '/*gsi']);
+            head=readgsif_header([GSI_file_want filesep GSI_names(1).name]);
 
 
             for JJ=1:length(GSI_names)
@@ -149,8 +134,27 @@ for Iyear=1:length(year_want)
             for Iday=1:length(tabs_start_unique)
                 disp(datestr(tabs_start_unique(Iday)));
 
-                Ifile_want=find(contains(GSI_file_array, datestr(tabs_start_unique(Iday),30)));
+                Igood=find(tabs_start==tabs_start_unique(Iday));
+                manual.tabs=tabs(Igood);
+                manual.tsec=(tabs(Igood)-tabs_start_unique(Iday))*24*3600;
+                manual.tsec=manual.tsec*(1+head.tdrift/86400);
+                manual.duration=manual.ind.duration(Ipass(Igood),Id);
+                manual.tmid=manual.tsec+0.5*manual.duration;
+                manual.tend=manual.tsec+manual.duration;
 
+
+                mydir=pwd;
+                cd(output_dir)
+                if Iday==1
+                    eval(sprintf('!mkdir 20%s', year_want{Iyear}));
+                end
+                cd(sprintf('20%s',year_want{Iyear}));
+                if Iday==1
+                    eval(sprintf('!mkdir Site%s',Site{Isite}));
+                end
+                cd(mydir)
+
+                Ifile_want=find(contains(GSI_file_array, datestr(tabs_start_unique(Iday),30)));
 
                 %%%%%Import data%%%%%%%%
                 fprintf('Reading %s\n',GSI_names(Ifile_want).name);
@@ -158,7 +162,7 @@ for Iyear=1:length(year_want)
                 %x=int16(x(1,:)'-2^15);
                 tic
                 if strcmpi(GSI_file_type,'gsi')
-                    [x,headd]=readgsi_omni_only([GSI_file_want filesep GSI_names(Ifile_want).name],0,debug.sec_to_load);
+                    [x,~,head]=readgsi_omni_only([GSI_file_want filesep GSI_names(Ifile_want).name],0,debug.sec_to_load);
                 else
                     [x,Fs]=audioread([GSI_file_want filesep GSI_names(Ifile_want).name],[1/1000 debug.sec_to_load]*1000,'native');
 
@@ -167,14 +171,86 @@ for Iyear=1:length(year_want)
                 %x=int16(x-2^15);
                 x=x-2^15;
 
-                %[x,amp_scale]=calibrate_GSI_signal(x, 'DASARC');
-                %amp_Scale = (2.5/65535)*(10^(149/20));
-
                 %%%Process and save all manual detections
+                %if 1==0
+                disp('Starting manual spectrograms')
                 sub_process_manual_detections;
+                disp('Finished manual spectrograms')
+                %end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%% Now generate false detections by a simple event
                 %%% detector and check that they aren't whale calls.
+                %
+                %First, to save memory we will load data into chunks.
+                %Chunks must be short enough that the background spectrum
+                %does not evolve substantially over the interval
+                %chunk_sample=60;  
+
+                 %Set up energy detector.  Example for bowhead whale analysis that monitors between 25 and 350 Hz,
+                %  using a set of detectors with 37 Hz bandwidth.
+                K=1;
+                param.energy.Nfft=256;
+                param.energy.Fs =head.Fs;
+                param.energy.ovlap = 0.75;
+                param.energy.flo_det=25;
+                param.energy.fhi_det=350;
+                param.energy.burn_in_time=1;  %Time in minutes
+                param.energy.eq_time=10;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
+                param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
+                param.energy.threshold=10;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
+                param.energy.TolTime=1e-4;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
+                param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
+                param.energy.MaxTime=3;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
+                param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug information. 1:  SEL output.  2:  equalized background noise. 3: SNR.';K=K+1;
+
+
+                Nchunks=floor(length(x)/(chunk_sample*head.Fs));
+                for Ichunk=1:Nchunks
+                     Iss=1+(Ichunk-1)*chunk_sample*head.Fs;
+                     x_chunk=x(Iss:(Iss-1+chunk_sample*head.Fs));
+                     [detect,debugg]=MultipleBandEnergyDetector(x_chunk,head.tabs_start+datenum(0,0,0,0,0,(Ichunk-1)*chunk_sample),param.energy);
+                     detect.tstart=detect.tstart+(Ichunk-1)*chunk_sample;
+                     detect.tend=detect.tend+(Ichunk-1)*chunk_sample;
+                     %detect.tmid_abs=0.5*(detect.tstart_abs+detect.tend_abs);
+
+                     param.compare.ovlap=0.5;
+                     Score{Ichunk}=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
+                end
+
+                keyboard
+                     for Idet=1:length(detect.tstart)
+
+                         %%%Determine whether any overlap exists between
+                         %%%manual detections and these detections.
+                         %%%make comparisons in terms of absolute times.
+                         %%% Any comparison needs to look at fraction of
+                         %%% overlap between detections.
+                         %Imatch=find((detect.tstart_abs(Idet)>=manual.tabs) & (detect.tstart_abs(Idet)<=(manual.tabs+datenum(0,0,0,0,0,manual.duration))));
+                         
+                         if ~isempty(Imatch)
+                             keyboard
+                         end
+
+                         continue
+                         Imid=round(head.Fs*0.5*(detect.tstart(Idet)+detect.tend(Idet)));
+                         Ixx=Imid+0.5*file_len_sec*head.Fs*[-1 1];
+                         
+                         Ixx(1)=max([1 (Ixx(1))]);
+                         Ixx(2)=min([length(x) Ixx(2)])-1;
+                         y=x(Ixx(1):Ixx(2));
+                         if length(y)~=head.Fs*file_len_sec
+                             disp('File length not right')
+                             continue
+                         end
+
+                         [SNR_gram,FF,TT]=create_normalized_spectrogram(y,head.Fs,spectrogram_len_sec,param.spec);
+
+                     end
+
+                %end
+               
+             
 
             end %Iday
         end %Id
