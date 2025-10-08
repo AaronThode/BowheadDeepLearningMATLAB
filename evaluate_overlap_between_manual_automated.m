@@ -22,6 +22,9 @@ for I=1:length(t1_s)
     %score(Imax)=frac_ovlap>=ovlap;
     score(Imax)=frac_ovlap;
     manual_index(Imax)=I;
+    %if I==1783
+    %    keyboard
+    %end
 
 
 end

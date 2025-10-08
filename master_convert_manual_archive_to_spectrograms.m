@@ -21,6 +21,7 @@ if exist(GSI_file_dir)==0
 end
 debug_plot=false;
 debug.sec_to_load=1*60*60;
+debug.Iday_start=2;
 
 %write_files=true;
 
@@ -134,7 +135,7 @@ for Iyear=1:length(year_want)
                 GSI_file_array{JJ}=GSI_names(JJ).name;
             end
 
-            for Iday=1:length(tabs_start_unique)
+            for Iday=debug.Iday_start:length(tabs_start_unique)
                 disp(datestr(tabs_start_unique(Iday)));
 
                 Igood=find(tabs_start==tabs_start_unique(Iday));
@@ -174,15 +175,16 @@ for Iyear=1:length(year_want)
                 toc
                 %x=int16(x-2^15);
                 x=x-2^15;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                %%%Process and save all manual detections
-                %if 1==0
-                disp('Starting manual spectrograms')
-                sub_process_manual_detections;
-                disp('Finished manual spectrograms')
-                %end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%Process and save all manual detections
+                
+                disp('Starting manual spectrograms')
+                Itemp=Igood;
+                sub_process_manual_detections;
+                clear Itemp
+                disp('Finished manual spectrograms')
+                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%Energy Detector.m%%%%%%%
                 %%% Now generate false detections by a simple event
                 %%% detector and check that they aren't whale calls.
                 %
@@ -198,14 +200,14 @@ for Iyear=1:length(year_want)
                 param.energy.Fs =head.Fs;
                 param.energy.ovlap = 0.75;
                 param.energy.flo_det=25;
-                param.energy.fhi_det=350;
-                param.energy.burn_in_time=1;  %Time in minutes
-                param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
+                param.energy.fhi_det=450;
+                param.energy.burn_in_time=0.5;  %Time in minutes
+                param.energy.eq_time=10;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
                 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
-                param.energy.threshold=10;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
+                param.energy.threshold=5;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
                 param.energy.TolTime=1e-4;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
                 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
-                param.energy.MaxTime=3;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
+                param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
                 param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug information. 1:  SEL output.  2:  equalized background noise. 3: SNR.';K=K+1;
 
 
@@ -218,22 +220,29 @@ for Iyear=1:length(year_want)
                      detect.tend=detect.tend+(Ichunk-1)*chunk_sample;
                      %detect.tmid_abs=0.5*(detect.tstart_abs+detect.tend_abs);
 
+                      %%%Determine whether any overlap exists between
+                         %%%manual detections and these detections.
+                         %%%make comparisons in terms of absolute times.
+                        
                      param.compare.ovlap=0.5;
                      [Score{Ichunk},Manual_index]=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
                 %end
 
                      Idet_match=find(Score{Ichunk}>0);
+                     Manual_index_match=Manual_index(Score{Ichunk}>0);
+                     Imiss=setdiff(1:max(Manual_index_match),Manual_index_match);
+                     fprintf('%i out of %i (%6.2f percent) manual detections missing from automated detections\n',length(Imiss),max(Manual_index_match),100*length(Imiss)/max(Manual_index_match))
+                     
+
+                     %%%%%%Examine missed manual detections
+                     debug_plot=true;
+                     Itemp=Imiss;
+                     disp('Displaying missed manual detections')
+                     sub_process_manual_detections;
+
                      for Idet=1:length(Idet_match)
 
                          II=Idet_match(Idet);
-                         %%%Determine whether any overlap exists between
-                         %%%manual detections and these detections.
-                         %%%make comparisons in terms of absolute times.
-                         %%% Any comparison needs to look at fraction of
-                         %%% overlap between detections.
-                         %Imatch=find((detect.tstart_abs(Idet)>=manual.tabs) & (detect.tstart_abs(Idet)<=(manual.tabs+datenum(0,0,0,0,0,manual.duration))));
-                        
-
                          
                          Imid=round(head.Fs*0.5*(detect.tstart(II)+detect.tend(II)));
                          Ixx=Imid+0.5*file_len_sec*head.Fs*[-1 1];
@@ -247,7 +256,7 @@ for Iyear=1:length(year_want)
                          end
 
                          [SNR_gram,FF,TT]=create_normalized_spectrogram(y,head.Fs,spectrogram_len_sec,param.spec);
-                            debug_plot=true;
+                            
                          if debug_plot
                              figure(2);
                              subplot(2,1,1)
@@ -258,14 +267,15 @@ for Iyear=1:length(year_want)
                              subplot(2,1,2)
                              imagesc(TT,FF,SNR_gram);colorbar;axis xy
                              title('Final SNR image')
-                             title(sprintf('Final SNR image, SNR: %6.2f, abs start: %s',detect.dB_RMS(II),datestr(detect.tstart_abs(II))));
+                             title(sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
+                                 detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II)));
 
                              pause
                          end
 
-                     end
+                     end %Idet
 
-                end
+                end %Ichunk
                
              
 
