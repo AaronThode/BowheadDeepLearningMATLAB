@@ -5,7 +5,7 @@
 
 
 %%%%%%Examine missed manual detections
-param.spec.debug_plot=true;
+%param.spec.debug_plot=true;
 %Itemp=Imiss;
 
 if param.spec.debug_plot

@@ -65,7 +65,7 @@ param.energy.fhi_det=param.event.fmax;
 param.energy.burn_in_time=0.25;  %Time in minutes
 param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
-param.energy.threshold=5;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
+param.energy.threshold=10;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
 param.energy.TolTime=0.5;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
 param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
