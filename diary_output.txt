@@ -12,3 +12,10 @@ Starting manual spectrograms
 In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('master_create_supervised_dataset', '/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Preprocessing_GSI_Data.dir/master_create_supervised_dataset.m', 250)" style="font-weight:bold">master_create_supervised_dataset</a> (<a href="matlab: opentoline('/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Preprocessing_GSI_Data.dir/master_create_supervised_dataset.m',250,0)">line 250</a>)
                     [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 } 
+!ls .gitignore
+.gitignore
+!more .gitignore
+*.asv
+*.mat
+*.jpg
+.gitignore (END)
