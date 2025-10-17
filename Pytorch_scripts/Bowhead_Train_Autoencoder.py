@@ -8,6 +8,13 @@ import random
 import matplotlib.pyplot as plt
 
 
+relative_path_from_cwd = os.path.join("data", "input.txt")
+print(f"Path relative to CWD: {relative_path_from_cwd}")
+
+    # Relative path navigating up a directory
+relative_path_up_one = os.path.join("..", "config", "settings.ini")
+print(f"Path navigating up: {relative_path_up_one}")
+
 savedir='/Users/thode/Desktop/BowheadEvents.dir/'
 folder_path = savedir # Define the folder containing the detections
 image_scale_factor = 5  # factor to multiply SNR by for saving as unit8 image

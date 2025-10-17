@@ -1,4 +1,4 @@
-function [SNR_gram,FF,TT]=create_snippet(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
+function [SNR_gram,FF,TT]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
 %[SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr)
 
 SNR_gram=[];TT=[];FF=[];
@@ -14,12 +14,12 @@ if length(y)~=Fs*file_len_sec
     return
 end
 
-[SNR_gram,FF,TT]=create_normalized_spectrogram(y,Fs,spectrogram_len_sec,param);
+[SNR_gram,FF,TT]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
 
 if param.debug_plot
     figure(1)
     subplot(2,1,1)
-    spectrogram((y),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
+    spectrogram(double(y),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
     clim([0 30]);colorbar
    %title(sprintf('Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Itemp)))
     title(titstr{1})

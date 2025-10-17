@@ -12,19 +12,19 @@ clear
 !rm diary_output.txt
 diary diary_output.txt
 strr='ABCDEFG';
-GSI_file_dir='/Volumes/Shared-1/Data/';
-%GSI_file_dir='/Volumes/Bowhead4/';
-GSI_file_type='GSI';
+GSI_file_dir='/Volumes/Shared/Data/';
+WAV_file_dir='/Volumes/Bowhead4/';
+data_file_type='WAV'; %'GSI' or 'WAV'
 Manual_record_files_dir='../Shell_Manual_Results';
 output_dir='../Supervised_database.dir';
-if exist(GSI_file_dir)==0
-    error('GSI_file_dir not present')
-end
+
+
+param.spec.debug_plot=true;
 
 debug.sec_to_load=2*60*60+1;
 debug.Iday_start=5;
-debug.sec_to_load=Inf;
-debug.Iday_start=1;
+%debug.sec_to_load=Inf;
+%debug.Iday_start=1;
 
 write_files=true;
 
@@ -40,7 +40,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=6*60*60;  %seconds
+chunk_sample=1*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -50,7 +50,6 @@ param.event.image_scale_factor = 5;  % factor to multiply SNR by for saving as u
 param.event.fmin = 25;
 param.event.fmax = 475;
 
-param.spec.debug_plot=false;
 param.spec.Nfft=256;
 param.spec.ovlap=0.75;
 param.spec.image_scale_factor = param.event.image_scale_factor;
@@ -78,6 +77,16 @@ param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug inf
 
 nu=1.7;
 
+if strcmpi(data_file_type,'gsi')
+    if exist(GSI_file_dir,'dir')==0
+        error('GSI_file_dir not present')
+    end
+elseif exist(WAV_file_dir,'dir')==0
+    error('WAV_file_dir not present')
+
+elseif exist(WAV_file_dir,'dir')==7
+    head_info=load('GSI_header_table.mat');
+end
 
 for Iyear=1:length(year_want)
     for Isite=1:length(Site)
@@ -137,26 +146,46 @@ for Iyear=1:length(year_want)
             tabs_start=datenum(temp);
             tabs_start_unique=unique(tabs_start);
 
-            %%%Placeholder to read in clock drift information for GSI
-            %%%file for this day...
-
-            GSI_file_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
-                GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
-                Site{Isite},year_want{Iyear},strr(Id));
-            %fs=head.Fs*(1+head.tdrift/86400);
-            if exist(GSI_file_want,'dir')~=7
-                GSI_file_want(end)='1';
-                if exist(GSI_file_want,'dir')~=7
-                    disp('Data do not exist')
+           
+            if strcmpi(data_file_type,'gsi')
+                dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
+                    GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
+                    Site{Isite},year_want{Iyear},strr(Id));
+                %fs=head.Fs*(1+head.tdrift/86400);
+                if exist(dir_want,'dir')~=7
+                    dir_want(end)='1';
+                    if exist(dir_want,'dir')~=7
+                        disp('Data do not exist')
+                        continue
+                    end
+                end
+                file_names=dir([dir_want '/*gsi']);
+                head=readgsif_header([dir_want filesep file_names(1).name]);
+            else %WAV file
+                 dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0_WAV', ...
+                    WAV_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
+                    Site{Isite},year_want{Iyear},strr(Id));
+                %fs=head.Fs*(1+head.tdrift/86400);
+                if exist(dir_want,'dir')~=7
+                    dir_want(end-4)='1';
+                    if exist(dir_want,'dir')~=7
+                        disp('Data do not exist')
+                        continue
+                    end
+                end
+                file_names=dir([dir_want '/*WAV']);
+                head=head_info.head{Iyear,Isite,Id};
+               
+            end
+           
+            Icountt=1;
+            clear file_array
+            for JJ=1:length(file_names)
+                if contains(file_names(JJ).name(1),'.')
                     continue
                 end
-            end
-            GSI_names=dir([GSI_file_want '/*gsi']);
-            head=readgsif_header([GSI_file_want filesep GSI_names(1).name]);
-
-
-            for JJ=1:length(GSI_names)
-                GSI_file_array{JJ}=GSI_names(JJ).name;
+                file_array{Icountt}=file_names(JJ).name;
+                Icountt=Icountt+1;
             end
 
             for Iday=debug.Iday_start:length(tabs_start_unique)
@@ -177,34 +206,34 @@ for Iyear=1:length(year_want)
                 if create_folder_flag
                     mydir=pwd;
                     cd(output_dir)
-                    eval(sprintf('!mkdir 20%s', year_want{Iyear}));
-                    cd(sprintf('20%s',year_want{Iyear}));
-                    eval(sprintf('!mkdir Site%s',Site{Isite}));
-                    cd(sprintf('Site%s',Site{Isite}));
+                    %eval(sprintf('!mkdir 20%s', year_want{Iyear}));
+                    %cd(sprintf('20%s',year_want{Iyear}));
+                    %eval(sprintf('!mkdir Site%s',Site{Isite}));
+                    %cd(sprintf('Site%s',Site{Isite}));
                     !mkdir Bowhead_calls.dir
                     !mkdir Other_sounds.dir
                     cd(mydir)
                     create_folder_flag=false;
                 end
                
-                Ifile_want=find(contains(GSI_file_array, datestr(tabs_start_unique(Iday),30)));
+                Ifile_want=find(contains(file_array, datestr(tabs_start_unique(Iday),30)));
 
                 %%%%%Import data%%%%%%%%
-                fprintf('Reading %s\n',GSI_names(Ifile_want).name);
-                %[x,headd]=(readgsi([GSI_file_want filesep GSI_names(Ifile_want).name],0,Inf));
-                %x=int16(x(1,:)'-2^15);
+                fprintf('Reading %s\n',file_array{Ifile_want});
                 tic
-                if strcmpi(GSI_file_type,'gsi')
-                    [x,~,head]=readgsi_omni_only([GSI_file_want filesep GSI_names(Ifile_want).name],0,debug.sec_to_load);
-                else
-                    [x,Fs]=audioread([GSI_file_want filesep GSI_names(Ifile_want).name],[1/1000 debug.sec_to_load]*1000,'native');
+                if strcmpi(data_file_type,'gsi')
+                    [x,~,head]=readgsi_omni_only([dir_want filesep file_array{Ifile_want}],0,debug.sec_to_load);
+                    x=x-2^15;
 
+                else 
+                    head.tabs_start=datenum(file_array{Ifile_want}(8:22),'yyyymmddTHHMMSS'); %'dd-mmm-yyyy HH:MM:SS'
+                    head.tabs_end=head.tabs_start+datenum(0,0,1,0,0,0);
+                    [x,Fs]=audioread([dir_want filesep file_array{Ifile_want}],[1/1000 debug.sec_to_load]*head.Fs,'native');
                 end
                 toc
                 %x=int16(x-2^15);
-                x=x-2^15;
-
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%Process and save all manual detections
+                
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%Process and save all manual detections%%%%%%%%%%%%%%
 
                 disp('Starting manual spectrograms')
 
@@ -215,18 +244,19 @@ for Iyear=1:length(year_want)
                 for I=1:length(Igood)
                     tmid=manual.tmid(I);
 
-
-                    titstr{1}=sprintf('Manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Igood));
+                    titstr{1}=sprintf('Manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,I,length(Igood));
                     titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s',manual.SNR(I),datestr(manual.tabs(I)));
 
                     [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 
                     if write_files
-                        output_name=GSI_names(Ifile_want).name(1:(end-4));
+                        output_name=file_array{Ifile_want}(1:(end-4));
                         tabs_mid=tabs(Igood(I))+datenum(0,0,0,0,0,tmid-manual.tsec(I));
                         temp=datestr(tabs_mid,30);
                         output_name(17:end)=temp(10:end);
-                        output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
+                        %output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
+                        output_name=[output_dir filesep  'Bowhead_calls.dir' filesep output_name '.mat'];
+
                         save(output_name,'SNR_gram','FF','TT');
                     end
                 end %I in Igood
@@ -288,13 +318,13 @@ for Iyear=1:length(year_want)
 
                          II=Idet_notWhale(Idet);
                          tmid=0.5*(detect.tstart(II)+detect.tend(II));
-                         titstr{1}=sprintf('Non-whale detection Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,Idet,length(Idet_notWhale));
+                         titstr{1}=sprintf('Non-whale detection Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,Idet,length(Idet_notWhale));
                          titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
                              detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));
                          [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 
                          if write_files
-                             output_name=GSI_names(Ifile_want).name(1:(end-4));
+                             output_name=file_array{Ifile_want}(1:(end-4));
                              tabs_mid=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid-detect.tstart(II));
                              temp=datestr(tabs_mid,30);
                              output_name(17:end)=temp(10:end);

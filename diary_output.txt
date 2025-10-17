@@ -1,0 +1,14 @@
+DASAR S510A0
+13-Sep-2010
+On this day there are 3213 manual detections.
+mkdir: Bowhead_calls.dir: File exists
+mkdir: Other_sounds.dir: File exists
+Reading S510A0T20100913T000000.WAV
+Elapsed time is 0.100365 seconds.
+Starting manual spectrograms
+{Operation terminated by user during <a href="matlab:matlab.internal.language.introspective.errorDocCallback('create_spectrogram_sample')" style="font-weight:bold">create_spectrogram_sample</a>
+
+
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('master_create_supervised_dataset', '/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Preprocessing_GSI_Data.dir/master_create_supervised_dataset.m', 250)" style="font-weight:bold">master_create_supervised_dataset</a> (<a href="matlab: opentoline('/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Preprocessing_GSI_Data.dir/master_create_supervised_dataset.m',250,0)">line 250</a>)
+                    [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+} 
