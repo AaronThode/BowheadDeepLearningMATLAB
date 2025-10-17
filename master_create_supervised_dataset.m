@@ -9,8 +9,10 @@
 
 close all
 clear
+!rm diary_output.txt
+diary diary_output.txt
 strr='ABCDEFG';
-GSI_file_dir='/Volumes/Shared/Data/';
+GSI_file_dir='/Volumes/Shared-1/Data/';
 %GSI_file_dir='/Volumes/Bowhead4/';
 GSI_file_type='GSI';
 Manual_record_files_dir='../Shell_Manual_Results';
@@ -19,9 +21,10 @@ if exist(GSI_file_dir)==0
     error('GSI_file_dir not present')
 end
 
-debug.sec_to_load=2*60*60;
-%debug.Iday_start=5;
+debug.sec_to_load=2*60*60+1;
 debug.Iday_start=5;
+debug.sec_to_load=Inf;
+debug.Iday_start=1;
 
 write_files=true;
 
@@ -37,7 +40,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=1*60*60;  %seconds
+chunk_sample=6*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -65,7 +68,7 @@ param.energy.fhi_det=param.event.fmax;
 param.energy.burn_in_time=0.25;  %Time in minutes
 param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
-param.energy.threshold=10;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
+param.energy.threshold=5;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
 param.energy.TolTime=0.5;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
 param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
@@ -245,7 +248,7 @@ for Iyear=1:length(year_want)
                     fprintf('Chunk %i of %i in DASAR %s in day %s\n',Ichunk,Nchunks,DASAR_list{Id},datestr(tabs_start_unique(Iday)));
                     Iss=1+(Ichunk-1)*chunk_sample*head.Fs;
                     x_chunk=x(Iss:(Iss-1+chunk_sample*head.Fs));
-                    param.energy.debug=true;
+                    param.energy.debug=false;
                     [detect,debugg]=MultipleBandEnergyDetector(x_chunk,head.tabs_start+datenum(0,0,0,0,0,(Ichunk-1)*chunk_sample),param.energy);
                     detect.tstart=detect.tstart+(Ichunk-1)*chunk_sample;
                     detect.tend=detect.tend+(Ichunk-1)*chunk_sample;
@@ -280,12 +283,12 @@ for Iyear=1:length(year_want)
                             length(Idet_match),length(Idet_notWhale),length(Imiss))
 
                      %%%Created automated detections that are not whale calls%%%%%%%
-                     param.spec.debug_plot_notmatches=true;
+                     param.spec.debug_plot=false;
                      for Idet=1:length(Idet_notWhale)
 
                          II=Idet_notWhale(Idet);
                          tmid=0.5*(detect.tstart(II)+detect.tend(II));
-                         titstr{1}=sprintf('Non-whale detection Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,Idet,length(Idet_match));
+                         titstr{1}=sprintf('Non-whale detection Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,Idet,length(Idet_notWhale));
                          titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
                              detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));
                          [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
@@ -300,9 +303,11 @@ for Iyear=1:length(year_want)
                          end
                      end %Idet
                    
-
+                fprintf('Finished Chunk %i of %i in DASAR %s in day %s\n',Ichunk,Nchunks,DASAR_list{Id},datestr(tabs_start_unique(Iday)));
+                   
                 end %Ichunk
-                pause(5);
+                
+                pause(1);
                 %debug_plot=false;
 
             end %Iday

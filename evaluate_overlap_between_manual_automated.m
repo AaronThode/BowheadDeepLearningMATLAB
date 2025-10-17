@@ -47,7 +47,7 @@ for I=1:length(t1_s)  %%For each manual detection
        % round([t1_s(JJ) t1_e(JJ)])
     else
         disp('Too many manual detections match this automated detection')
-        keyboard
+        %keyboard
     end
 
 
