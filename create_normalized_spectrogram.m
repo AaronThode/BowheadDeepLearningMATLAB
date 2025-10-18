@@ -14,6 +14,7 @@ median_noise=median([B(:,1:NN) B(:,(length(T)-NN):length(T))],2);
 Indexx=(NN+1):(length(T)-NN-1);
 BB=(param.image_scale_factor)*(B(:,Indexx)-median_noise);
 T=T(Indexx);
+T=T-T(1);
 if any(BB(:)>255)
     fprintf('SNR greater than %6.2f\n',255/param.image_scale_factor);
     keyboard

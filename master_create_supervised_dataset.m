@@ -23,7 +23,7 @@ param.spec.debug_plot=true;
 
 debug.sec_to_load=2*60*60+1;
 debug.Iday_start=5;
-%debug.sec_to_load=Inf;
+debug.sec_to_load=Inf;
 %debug.Iday_start=1;
 
 write_files=true;
@@ -40,7 +40,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=1*60*60;  %seconds
+chunk_sample=24*60*60-5;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -109,6 +109,8 @@ for Iyear=1:length(year_want)
         end
         manual=load(fname_mat);
 
+
+        %%%%%Restrict database to certain types of calls...%%%%%
         if strcmpi(sound_type,'whale')
             Itype=find(manual.localized.wctype<=7);  %bowhead whale calls only
         elseif strcmpi(sound_type,'seal')
@@ -120,12 +122,15 @@ for Iyear=1:length(year_want)
             fprintf('No %s here\n',sound_type);
             continue
         end
+
+
         fieldnamess=fieldnames(manual.ind);
         %manual.ind.duration=manual.ind.duration(Itype,:);
         for JJ=1:length(fieldnamess)
             manual.ind.(fieldnamess{JJ})=manual.ind.(fieldnamess{JJ})(Itype,:);
         end
-
+        call_type_all=manual.localized.wctype;
+        call_type_all=call_type_all(Itype);
 
         %%%Loop through dates and create a selection file for each DASAR and day
         create_folder_flag=true;  %Flag to check for output directory structure when a new year-site combo is started
@@ -134,14 +139,19 @@ for Iyear=1:length(year_want)
 
             %keyboard
             fprintf('DASAR %s\n',DASAR_list{Id});
-            tabs=datenum(1970,1,1,-8,0,manual.ind.ctime(:,Id)); %-8 converts from UTC time (archive) to local time (GSI WAV)
 
-            Ipass=find(~isnan(tabs));
-            tabs=tabs(Ipass);
-            SIG_all=manual.ind.sigdb(Ipass,Id);
-            SNR_all=manual.ind.stndb(Ipass,Id);
 
-            temp=datevec(tabs);
+            tabs_DASAR=datenum(1970,1,1,-8,0,manual.ind.ctime(:,Id)); %-8 converts from UTC time (archive) to local time (GSI WAV)
+
+            Iexist=find(~isnan(tabs_DASAR));
+            tabs_DASAR=tabs_DASAR(Iexist);
+            SIG_all=manual.ind.sigdb(Iexist,Id);
+            SNR_all=manual.ind.stndb(Iexist,Id);
+            fmin_all=manual.ind.flo(Iexist,Id);
+            fmax_all=manual.ind.fhi(Iexist,Id);
+            call_type=call_type_all(Iexist);
+
+            temp=datevec(tabs_DASAR);
             temp(:,4:6)=0;
             tabs_start=datenum(temp);
             tabs_start_unique=unique(tabs_start);
@@ -174,10 +184,14 @@ for Iyear=1:length(year_want)
                     end
                 end
                 file_names=dir([dir_want '/*WAV']);
-                head=head_info.head{Iyear,Isite,Id};
+
+                %%%Get appropirate clock drift
+                head=get_GSI_head_info(head_info,year_want{Iyear},Site{Isite},strr(Id));
                
             end
            
+            %%%%Get list of qualified files/days for this Year/Site/DASAR
+            %%%%combo
             Icountt=1;
             clear file_array
             for JJ=1:length(file_names)
@@ -191,16 +205,20 @@ for Iyear=1:length(year_want)
             for Iday=debug.Iday_start:length(tabs_start_unique)
                 disp(datestr(tabs_start_unique(Iday)));
 
-                Igood=find(tabs_start==tabs_start_unique(Iday));
-                fprintf('On this day there are %i manual detections.\n',length(Igood));
-                manual.tabs=tabs(Igood);
-                manual.tsec=(tabs(Igood)-tabs_start_unique(Iday))*24*3600;
+                Ithis_day=find(tabs_start==tabs_start_unique(Iday));
+                fprintf('On this day there are %i manual detections.\n',length(Ithis_day));
+                manual.tabs=tabs_DASAR(Ithis_day);
+                manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
                 manual.tsec=manual.tsec*(1+head.tdrift/86400);
-                manual.duration=manual.ind.duration(Ipass(Igood),Id);
+                manual.duration=manual.ind.duration(Iexist(Ithis_day),Id);
                 manual.tmid=manual.tsec+0.5*manual.duration;
                 manual.tend=manual.tsec+manual.duration;
-                manual.SNR=SNR_all(Igood);
-                manual.sig=SIG_all(Igood);
+                manual.SNR=SNR_all(Ithis_day);
+                manual.sig=SIG_all(Ithis_day);
+                manual.call_type=call_type(Ithis_day);
+                manual.fmin=fmin_all(Ithis_day);
+                manual.fmax=fmax_all(Ithis_day);
+
 
                 %%%Create directory structure%%%%%%%
                 if create_folder_flag
@@ -241,19 +259,23 @@ for Iyear=1:length(year_want)
                 %Itemp is associated with Igood, which is associated with tabs.
                 %Igood_org associated with original manual.ind.* fields
 
-                for I=1:length(Igood)
+                for I=1:length(Ithis_day)
                     tmid=manual.tmid(I);
 
-                    titstr{1}=sprintf('Manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,I,length(Igood));
-                    titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s',manual.SNR(I),datestr(manual.tabs(I)));
+                    titstr{1}=sprintf('Manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,I,length(Ithis_day));
+                    titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s Call_type %i',manual.SNR(I),datestr(manual.tabs(I)),manual.call_type(I));
 
+                    param.spec.plot_fmin=manual.fmin(I);
+                    param.spec.plot_fmax=manual.fmax(I);
+                    param.spec.duration=manual.duration(I);
                     [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 
                     if write_files
                         output_name=file_array{Ifile_want}(1:(end-4));
-                        tabs_mid=tabs(Igood(I))+datenum(0,0,0,0,0,tmid-manual.tsec(I));
+                        tabs_mid=tabs_DASAR(Ithis_day(I))+datenum(0,0,0,0,0,tmid-manual.tsec(I));
                         temp=datestr(tabs_mid,30);
                         output_name(17:end)=temp(10:end);
+                        output_name=sprintf('%s_Type%i',output_name,manual.call_type(I));
                         %output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
                         output_name=[output_dir filesep  'Bowhead_calls.dir' filesep output_name '.mat'];
 
