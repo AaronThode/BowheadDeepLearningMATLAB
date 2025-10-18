@@ -6,16 +6,18 @@ import os
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+from scipy.io import loadmat
 
 
-relative_path_from_cwd = os.path.join("data", "input.txt")
+""" relative_path_from_cwd = os.path.join("data", "input.txt")
 print(f"Path relative to CWD: {relative_path_from_cwd}")
 
     # Relative path navigating up a directory
 relative_path_up_one = os.path.join("..", "config", "settings.ini")
 print(f"Path navigating up: {relative_path_up_one}")
-
-savedir='../../Supervised_database.dir/Unsupervised_images.dir/'
+ """
+savedir = os.path.join("..","..","Supervised_database.dir", "Unsupervised_images.dir")
+#savedir='../../Supervised_database.dir//'
 folder_path = savedir # Define the folder containing the detections
 image_scale_factor = 5  # factor to multiply SNR by for saving as unit8 image
 
@@ -26,17 +28,18 @@ validation_split = 0.2
 
 #define dataloader for loading detections
 
-filelist = [f for f in sorted(os.listdir(folder_path)) if f.endswith('.npy')]
+filelist = [f for f in sorted(os.listdir(folder_path)) if f.endswith('.mat')]
 file_path = os.path.join(folder_path, filelist[0])
-image = np.load(file_path)
+#image = np.load(file_path)
+image = loadmat(file_path)['SNR_gram']
 nrow,ncol = image.shape
-print("nrow,ncol=",nrow,ncol)
+print(" images have dimensions of nrow,ncol=",nrow,ncol)
 
 
 class CustomDatasetFull(Dataset):
     def __init__(self, folder_path, transform=None, shuffle=False):
         self.folder_path = folder_path
-        self.file_list = [f for f in sorted(os.listdir(folder_path)) if f.endswith('.npy')]
+        self.file_list = [f for f in sorted(os.listdir(folder_path)) if f.endswith('.mat')]
         if shuffle:
             random.shuffle(self.file_list)
         self.transform = transform
@@ -46,8 +49,8 @@ class CustomDatasetFull(Dataset):
 
     def __getitem__(self, idx):
         file_path = os.path.join(self.folder_path, self.file_list[idx])
-        image = np.load(file_path)
-       
+        #image = np.load(file_path)
+        image = loadmat(file_path)['SNR_gram']
         #image = transforms.ToTensor()(image)
        
        # fig, ax = plt.subplots(layout='constrained')
