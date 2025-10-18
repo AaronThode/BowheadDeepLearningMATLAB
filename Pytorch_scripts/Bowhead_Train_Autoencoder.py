@@ -114,20 +114,23 @@ class Autoencoder(nn.Module):
         self.t_conv1 = nn.ConvTranspose2d(16, 8, 2, stride=2)
         self.t_conv2 = nn.ConvTranspose2d(8, 4, 2, stride=2)
         self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2])
-        self.fc1 = nn.Linear(288, latent_dim)
-        self.fc2 = nn.Linear(latent_dim, 288)
+        image_dims=16*18 #was 288
+        self.fc1 = nn.Linear(image_dims, latent_dim)
+        self.fc2 = nn.Linear(latent_dim, image_dims)
         self.pool = nn.MaxPool2d(2, 2)  #AdaptiveAvgPool maybe better?
     def forward(self, x): #when running the model, this is the function that is called
+        image_dims=16*18
         x = torch.nn.functional.relu(self.conv1(x))        
         x = self.pool(x)
         x = torch.nn.functional.relu(self.conv2(x))
         x = self.pool(x)
         x = torch.nn.functional.relu(self.conv3(x))
         x = self.pool(x)
-        x = x.view(-1, 288)
+        x = x.view(-1,  image_dims)
         latent = torch.nn.functional.relu(self.fc1(x))
         x = torch.nn.functional.relu(self.fc2(latent))
         x = x.view(-1, 16, 1, 18)
+       # x = x.view(-1, 16, 1, 9)
         x = torch.nn.functional.relu(self.t_conv1(x))
         x = torch.nn.functional.relu(self.t_conv2(x))
         output = torch.sigmoid(self.t_conv3(x))
