@@ -11,7 +11,7 @@ close all
 clear
 !rm diary_output.txt
 diary diary_output.txt
-strr='ABCDEFG';
+DASAR_strings='ABCDEFG';
 GSI_file_dir='/Volumes/Shared/Data/';
 WAV_file_dir='/Volumes/Bowhead4/';
 data_file_type='WAV'; %'GSI' or 'WAV'
@@ -21,8 +21,9 @@ output_dir='../Supervised_database.dir';
 
 param.spec.debug_plot=true;
 
-debug.sec_to_load=2*60*60+1;
+debug.sec_to_load=6*60*60+1;
 debug.Iday_start=5;
+debug.Idasar_start=3;
 debug.sec_to_load=Inf;
 %debug.Iday_start=1;
 
@@ -30,6 +31,7 @@ write_files=true;
 
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
+
 year_want={'10'};
 Site={'5'};
 
@@ -40,7 +42,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=24*60*60-5;  %seconds
+chunk_sample=6*60*60-5;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -90,9 +92,9 @@ end
 
 for Iyear=1:length(year_want)
     for Isite=1:length(Site)
-        for I=1:length(strr)
+        for I=debug.Idasar_start:length(DASAR_strings)
             % DASAR_list{I}=['S314' strr(I) '0'];
-            DASAR_list{I}=sprintf('S%s%s%s0',Site{Isite},year_want{Iyear},strr(I));
+            DASAR_list{I}=sprintf('S%s%s%s0',Site{Isite},year_want{Iyear},DASAR_strings(I));
         end
         ctmin=0;
         ctmax=Inf;
@@ -135,7 +137,7 @@ for Iyear=1:length(year_want)
         %%%Loop through dates and create a selection file for each DASAR and day
         create_folder_flag=true;  %Flag to check for output directory structure when a new year-site combo is started
         
-        for Id=1:size(manual.ind.wgt,2)  %For each DASAR
+        for Id=debug.Idasar_start:size(manual.ind.wgt,2)  %For each DASAR
 
             %keyboard
             fprintf('DASAR %s\n',DASAR_list{Id});
@@ -160,7 +162,7 @@ for Iyear=1:length(year_want)
             if strcmpi(data_file_type,'gsi')
                 dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
                     GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
-                    Site{Isite},year_want{Iyear},strr(Id));
+                    Site{Isite},year_want{Iyear},DASAR_strings(Id));
                 %fs=head.Fs*(1+head.tdrift/86400);
                 if exist(dir_want,'dir')~=7
                     dir_want(end)='1';
@@ -174,7 +176,7 @@ for Iyear=1:length(year_want)
             else %WAV file
                  dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0_WAV', ...
                     WAV_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
-                    Site{Isite},year_want{Iyear},strr(Id));
+                    Site{Isite},year_want{Iyear},DASAR_strings(Id));
                 %fs=head.Fs*(1+head.tdrift/86400);
                 if exist(dir_want,'dir')~=7
                     dir_want(end-4)='1';
@@ -186,7 +188,7 @@ for Iyear=1:length(year_want)
                 file_names=dir([dir_want '/*WAV']);
 
                 %%%Get appropirate clock drift
-                head=get_GSI_head_info(head_info,year_want{Iyear},Site{Isite},strr(Id));
+                head=get_GSI_head_info(head_info,year_want{Iyear},Site{Isite},DASAR_strings(Id));
                
             end
            
@@ -276,7 +278,7 @@ for Iyear=1:length(year_want)
                         temp=datestr(tabs_mid,30);
                         output_name(17:end)=temp(10:end);
                         output_name=sprintf('%s_Type%i',output_name,manual.call_type(I));
-                        %output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
+                        output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
                         output_name=[output_dir filesep  'Bowhead_calls.dir' filesep output_name '.mat'];
 
                         save(output_name,'SNR_gram','FF','TT');
@@ -300,6 +302,8 @@ for Iyear=1:length(year_want)
                     fprintf('Chunk %i of %i in DASAR %s in day %s\n',Ichunk,Nchunks,DASAR_list{Id},datestr(tabs_start_unique(Iday)));
                     Iss=1+(Ichunk-1)*chunk_sample*head.Fs;
                     x_chunk=x(Iss:(Iss-1+chunk_sample*head.Fs));
+
+
                     param.energy.debug=false;
                     [detect,debugg]=MultipleBandEnergyDetector(x_chunk,head.tabs_start+datenum(0,0,0,0,0,(Ichunk-1)*chunk_sample),param.energy);
                     detect.tstart=detect.tstart+(Ichunk-1)*chunk_sample;
@@ -350,6 +354,7 @@ for Iyear=1:length(year_want)
                              tabs_mid=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid-detect.tstart(II));
                              temp=datestr(tabs_mid,30);
                              output_name(17:end)=temp(10:end);
+                             output_name=sprintf('%s_Type%i',output_name,0);
                              output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Other_sounds.dir' filesep output_name '.mat'];
                              save(output_name,'SNR_gram','FF','TT');
                          end
