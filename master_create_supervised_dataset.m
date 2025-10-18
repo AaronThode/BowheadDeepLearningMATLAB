@@ -16,7 +16,7 @@ GSI_file_dir='/Volumes/Shared/Data/';
 WAV_file_dir='/Volumes/Bowhead4/';
 data_file_type='WAV'; %'GSI' or 'WAV'
 Manual_record_files_dir='../Shell_Manual_Results';
-output_dir='../Supervised_database.dir';
+output_dir='../Spectrogram_Image_Database.dir';
 
 
 param.spec.debug_plot=false;

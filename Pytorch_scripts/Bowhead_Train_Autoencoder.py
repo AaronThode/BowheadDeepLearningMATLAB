@@ -16,7 +16,7 @@ print(f"Path relative to CWD: {relative_path_from_cwd}")
 relative_path_up_one = os.path.join("..", "config", "settings.ini")
 print(f"Path navigating up: {relative_path_up_one}")
  """
-savedir = os.path.join("..","..","Supervised_database.dir", "Unsupervised_images.dir")
+savedir = os.path.join("..","..","Spectrogram_image_Database.dir", "Unsupervised_images.dir")
 #savedir='../../Supervised_database.dir//'
 folder_path = savedir # Define the folder containing the detections
 image_scale_factor = 5  # factor to multiply SNR by for saving as unit8 image
