@@ -8,8 +8,9 @@
 %param.spec.debug_plot=true;
 %Itemp=Imiss;
 
+param.spec.debug_plot=false;
 if param.spec.debug_plot
-    disp('Displaying missed manual detections')
+    fprintf('Displaying %i missed manual detections\n',length(Imiss));
 
     for I=1:length(Imiss)
         II=Imiss(I);
@@ -39,9 +40,9 @@ if param.spec.debug_plot_matches
         titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
             detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));
         
-         param.spec.plot_fmin=manual.fmin(II);
-        param.spec.plot_fmax=manual.fmax(II);
-        param.spec.duration=manual.duration(II);
+        param.spec.plot_fmin=detect.fmin(II);
+        param.spec.plot_fmax=detect.fmax(II);
+        param.spec.duration=detect.duration(II);
 
         [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 

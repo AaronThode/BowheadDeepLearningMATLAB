@@ -19,14 +19,12 @@ Manual_record_files_dir='../Shell_Manual_Results';
 output_dir='../Supervised_database.dir';
 
 
-param.spec.debug_plot=true;
+param.spec.debug_plot=false;
 
-debug.sec_to_load=6*60*60+1;
+%debug.sec_to_load=1*60*60+1;
 debug.Iday_start=5;
-debug.Idasar_start=3;
+debug.Idasar_start=7;
 debug.sec_to_load=Inf;
-%debug.Iday_start=1;
-
 write_files=true;
 
 year_want={'08','09','10','11','12','13','14'};
@@ -42,7 +40,7 @@ sound_type='whale'; %whale, seal
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=6*60*60-5;  %seconds
+chunk_sample=6*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
@@ -237,6 +235,10 @@ for Iyear=1:length(year_want)
                 end
                
                 Ifile_want=find(contains(file_array, datestr(tabs_start_unique(Iday),30)));
+                if isempty(Ifile_want)
+                    fprintf('%s is not present in %s\n',datestr(tabs_start_unique(Iday),30),dir_want);
+                    continue
+                end
 
                 %%%%%Import data%%%%%%%%
                 fprintf('Reading %s\n',file_array{Ifile_want});
@@ -278,7 +280,7 @@ for Iyear=1:length(year_want)
                         temp=datestr(tabs_mid,30);
                         output_name(17:end)=temp(10:end);
                         output_name=sprintf('%s_Type%i',output_name,manual.call_type(I));
-                        output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
+                       % output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
                         output_name=[output_dir filesep  'Bowhead_calls.dir' filesep output_name '.mat'];
 
                         save(output_name,'SNR_gram','FF','TT');
@@ -305,7 +307,7 @@ for Iyear=1:length(year_want)
 
 
                     param.energy.debug=false;
-                    [detect,debugg]=MultipleBandEnergyDetector(x_chunk,head.tabs_start+datenum(0,0,0,0,0,(Ichunk-1)*chunk_sample),param.energy);
+                    [detect,debugg]=MultipleBandEnergyDetector(double(x_chunk),head.tabs_start+datenum(0,0,0,0,0,(Ichunk-1)*chunk_sample),param.energy);
                     detect.tstart=detect.tstart+(Ichunk-1)*chunk_sample;
                     detect.tend=detect.tend+(Ichunk-1)*chunk_sample;
 
@@ -347,6 +349,11 @@ for Iyear=1:length(year_want)
                          titstr{1}=sprintf('Non-whale detection Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,Idet,length(Idet_notWhale));
                          titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
                              detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));
+
+                         param.spec.plot_fmin=detect.fmin(II);
+                         param.spec.plot_fmax=detect.fmax(II);
+                         param.spec.duration=detect.duration(II);
+
                          [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 
                          if write_files
@@ -355,7 +362,9 @@ for Iyear=1:length(year_want)
                              temp=datestr(tabs_mid,30);
                              output_name(17:end)=temp(10:end);
                              output_name=sprintf('%s_Type%i',output_name,0);
-                             output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Other_sounds.dir' filesep output_name '.mat'];
+                             %output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Other_sounds.dir' filesep output_name '.mat'];
+                             output_name=[output_dir filesep  'Other_sounds.dir' filesep output_name '.mat'];
+
                              save(output_name,'SNR_gram','FF','TT');
                          end
                      end %Idet
