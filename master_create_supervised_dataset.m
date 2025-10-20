@@ -21,10 +21,10 @@ output_dir='../Spectrogram_Image_Database.dir';
 
 param.spec.debug_plot=false;
 
-%debug.sec_to_load=1*60*60+1;
+debug.sec_to_load=6*60*60+1;
 debug.Iday_start=5;
 debug.Idasar_start=7;
-debug.sec_to_load=Inf;
+%debug.sec_to_load=Inf;
 write_files=true;
 
 year_want={'08','09','10','11','12','13','14'};
@@ -44,6 +44,7 @@ chunk_sample=6*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
 
+
 %%%Parameters for event detection
 param.event.dB_threshold = 20; % threshold above mean for detection
 param.event.image_scale_factor = 5;  % factor to multiply SNR by for saving as unit8 image
@@ -51,10 +52,11 @@ param.event.fmin = 25;
 param.event.fmax = 475;
 
 param.spec.Nfft=256;
-param.spec.ovlap=0.75;
+param.spec.ovlap=0.9;
 param.spec.image_scale_factor = param.event.image_scale_factor;
-param.spec.fmin = param.event.fmin;
-param.spec.fmax = param.event.fmax;
+param.spec.fmin = 0;
+param.spec.fmax = 500;
+param.spec.final_dims=8*[16 10];
 
 %Set up energy detector.  Example for bowhead whale analysis that monitors between 25 and 350 Hz,
 %  using a set of detectors with 37 Hz bandwidth.
@@ -266,6 +268,10 @@ for Iyear=1:length(year_want)
                 for I=1:length(Ithis_day)
                     tmid=manual.tmid(I);
 
+                    if length(x)/head.Fs-tmid<=0
+                        continue
+                    end
+
                     titstr{1}=sprintf('Manual detection: Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,I,length(Ithis_day));
                     titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s Call_type %i',manual.SNR(I),datestr(manual.tabs(I)),manual.call_type(I));
 
@@ -273,7 +279,9 @@ for Iyear=1:length(year_want)
                     param.spec.plot_fmax=manual.fmax(I);
                     param.spec.duration=manual.duration(I);
                     [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
-
+                    %if isempty(SNR_gram)
+                   %     keyboard
+                   % end
                     if write_files
                         output_name=file_array{Ifile_want}(1:(end-4));
                         tabs_mid=tabs_DASAR(Ithis_day(I))+datenum(0,0,0,0,0,tmid-manual.tsec(I));
