@@ -128,7 +128,8 @@ class Autoencoder(nn.Module):
         # padding_mode='zeros', device=None, dtype=None)[source]#
         self.t_conv1 = nn.ConvTranspose2d(n_channels, 8, 2, stride=2)
         self.t_conv2 = nn.ConvTranspose2d(8, 4, 2, stride=2)
-        self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2])
+        #self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2])
+        self.t_conv3 = nn.ConvTranspose2d(4, 1, [2,2], stride=[2,2])
 
         self.fc1 = nn.Linear(nel_reduced, latent_dim)
         self.fc2 = nn.Linear(latent_dim, nel_reduced)
@@ -142,7 +143,7 @@ class Autoencoder(nn.Module):
         x = torch.nn.functional.relu(self.conv3(x))
         x = self.pool(x)
         #x = x.view(-1,  nel_reduced) #address this line - Daniel attempts to flatten the tensor into single feature vector
-        x = x.view(-1, 1,  nel_reduced) #address this line - Daniel attempts to flatten the tensor into single feature vector
+        x = x.view(-1, 1, 1, nel_reduced) #address this line - Daniel attempts to flatten the tensor into single feature vector
         latent = torch.nn.functional.relu(self.fc1(x))
         x = torch.nn.functional.relu(self.fc2(latent))
         x = x.view(-1, n_channels, nrow_reduced, ncol_reduced)
