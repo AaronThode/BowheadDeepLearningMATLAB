@@ -16,6 +16,24 @@ end
 
 [SNR_gram,FF,TT]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
 
+%%Ensure image dimensions are divisible by 8 to allow it to be close to
+%%NUWC 128 by 144 image
+
+target_dim=8*floor(size(SNR_gram)/8);
+
+ncol_cut=floor((size(SNR_gram,2)-target_dim(2))/2);
+nrow_cut=max([1 floor((size(SNR_gram,1)-target_dim(1))/2)]);
+
+Itt=((ncol_cut+1):(length(TT)-ncol_cut));
+if nrow_cut==1
+    Iff=(nrow_cut+1):(length(FF));
+else
+    Iff=(nrow_cut+1):(length(FF)-nrow_cut);
+end
+
+SNR_gram=SNR_gram(Iff,Itt);TT=TT(Itt);FF=FF(Iff);
+
+
 if param.debug_plot
     figure(1)
     subplot(2,1,1)

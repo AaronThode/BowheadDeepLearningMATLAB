@@ -41,19 +41,7 @@ fmin = 20
 fmax = 475
 dB_threshold = 10  # threshold above mean for detection
 
-# loaddir = '/Volumes/Bowhead/Shell2010_GSI_Data/S510gsif/S510G0_WAV' #directory with .wav files
-# savedir = '/Users/oceaneboulais/Github/ThodeLab/BowheadWhale/BowheadResults'
-# if not os.path.exists(savedir):
-#     os.makedirs(savedir)
-# files = sorted(os.listdir(loaddir))
 
-
-#for file in files:
-#    try:
-#        y, fs = lb.load(os.path.join(loaddir, file), sr=1000)
-        # your processing here
-#   except Exception as e:
-#       print(f"Skipping file {file} due to error: {e}")
 
 def calculate_background_median(Pxx, T, window_sec):
     fs_spec = np.round(np.mean(1/np.diff(T)))
@@ -155,15 +143,17 @@ val_dataloader = DataLoader(val_dataset, batch_size=batch_size,shuffle=True)
 class Autoencoder(nn.Module):
     def __init__(self, latent_dim):
         super(Autoencoder, self).__init__()
-        self.conv1 = nn.Conv2d(1, 4, 3, padding=1) 
+        # Input spectrograms are 12x144 (so you were close)
+        self.conv1 = nn.Conv2d(1, 4, 3, padding=1) #stride default is 1, kernal is 3, padding is 1
         self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
         self.conv3 = nn.Conv2d(8, 16, 3, padding=1)
         self.t_conv1 = nn.ConvTranspose2d(16, 8, 2, stride=2)
         self.t_conv2 = nn.ConvTranspose2d(8, 4, 2, stride=2)
-        self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2])
+        self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2]) # 16 channels with 18 elements
+         # Calculate the size after convolutions and pooling
         self.fc1 = nn.Linear(288, latent_dim)
         self.fc2 = nn.Linear(latent_dim, 288)
-        self.pool = nn.MaxPool2d(2, 2)
+        self.pool = nn.MaxPool2d(2, 2)  #kernal size 2, stride is 2 to reduce image dimension size by half, no padding
     def forward(self, x):
         x = torch.nn.functional.relu(self.conv1(x))        
         x = self.pool(x)
@@ -171,10 +161,10 @@ class Autoencoder(nn.Module):
         x = self.pool(x)
         x = torch.nn.functional.relu(self.conv3(x))
         x = self.pool(x)
-        x = x.view(-1, 288)
+        x = x.view(-1, 288)  #flatten the tensor including channels, the size -1 inferred from other dimensions
         latent = torch.nn.functional.relu(self.fc1(x))
-        x = torch.nn.functional.relu(self.fc2(latent))
-        x = x.view(-1, 16, 1, 18)
+        x = torch.nn.functional.relu(self.fc2(latent)) #Back to flattend dimensions
+        x = x.view(-1, 16, 1, 18) #Reshape back to image16 channels with 18 elements
         x = torch.nn.functional.relu(self.t_conv1(x))
         x = torch.nn.functional.relu(self.t_conv2(x))
         output = torch.sigmoid(self.t_conv3(x))

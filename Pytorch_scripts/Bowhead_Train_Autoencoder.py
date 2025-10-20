@@ -33,7 +33,13 @@ file_path = os.path.join(folder_path, filelist[0])
 #image = np.load(file_path)
 image = loadmat(file_path)['SNR_gram']
 nrow,ncol = image.shape
+
+nrow_reduced = int(nrow/8)
+ncol_reduced = int(ncol/8)
+nel_reduced = nrow_reduced*ncol_reduced
+
 print(" images have dimensions of nrow,ncol=",nrow,ncol)
+print(" reduced dimensions before encoded to latent space: nrow_reduced,ncol_reduced,total el",nrow_reduced,ncol_reduced,nel_reduced)
 
 
 class CustomDatasetFull(Dataset):
@@ -108,28 +114,35 @@ val_dataloader = DataLoader(val_dataset, batch_size=batch_size,shuffle=True)
 class Autoencoder(nn.Module):
     def __init__(self, latent_dim): #Defines the structure of the autoencoder
         super(Autoencoder, self).__init__()  #need a sequential step?
-        self.conv1 = nn.Conv2d(1, 4, 3, padding=1) 
+
+        #class torch.nn.Conv2d(in_channels, out_channels, kernel_size, 
+        # stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', 
+        # device=None, dtype=None)
+        self.conv1 = nn.Conv2d(1, 4, 3, padding=1)  #stride default is 1, kernal is 3, padding is 1
         self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
         self.conv3 = nn.Conv2d(8, 16, 3, padding=1)
+        #class torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size, 
+        # stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1, 
+        # padding_mode='zeros', device=None, dtype=None)[source]#
         self.t_conv1 = nn.ConvTranspose2d(16, 8, 2, stride=2)
         self.t_conv2 = nn.ConvTranspose2d(8, 4, 2, stride=2)
         self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2])
-        image_dims=16*18 #was 288
-        self.fc1 = nn.Linear(image_dims, latent_dim)
-        self.fc2 = nn.Linear(latent_dim, image_dims)
+
+        self.fc1 = nn.Linear(nel_reduced, latent_dim)
+        self.fc2 = nn.Linear(latent_dim, nel_reduced)
         self.pool = nn.MaxPool2d(2, 2)  #AdaptiveAvgPool maybe better?
     def forward(self, x): #when running the model, this is the function that is called
-        image_dims=16*18
+       
         x = torch.nn.functional.relu(self.conv1(x))        
         x = self.pool(x)
         x = torch.nn.functional.relu(self.conv2(x))
         x = self.pool(x)
         x = torch.nn.functional.relu(self.conv3(x))
         x = self.pool(x)
-        x = x.view(-1,  image_dims)
+        x = x.view(-1,  nel_reduced)
         latent = torch.nn.functional.relu(self.fc1(x))
         x = torch.nn.functional.relu(self.fc2(latent))
-        x = x.view(-1, 16, 1, 18)
+        x = x.view(-1, nrow_reduced, 1, ncol_reduced)
        # x = x.view(-1, 16, 1, 9)
         x = torch.nn.functional.relu(self.t_conv1(x))
         x = torch.nn.functional.relu(self.t_conv2(x))
