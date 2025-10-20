@@ -31,12 +31,14 @@ validation_split = 0.2
 filelist = [f for f in sorted(os.listdir(folder_path)) if f.endswith('.mat')]
 file_path = os.path.join(folder_path, filelist[0])
 #image = np.load(file_path)
-image = loadmat(file_path)['SNR_gram']
+image = loadmat(file_path)['SNR_gram'] #3 variables: (184) time axis, freq axis, SNR_gram (128x184 image)
 nrow,ncol = image.shape
 
+n_channels = 16
+latent_dim = 16
 nrow_reduced = int(nrow/8)
 ncol_reduced = int(ncol/8)
-nel_reduced = nrow_reduced*ncol_reduced
+nel_reduced = nrow_reduced*ncol_reduced*n_channels
 
 print(" images have dimensions of nrow,ncol=",nrow,ncol)
 print(" reduced dimensions before encoded to latent space: nrow_reduced,ncol_reduced,total el",nrow_reduced,ncol_reduced,nel_reduced)
@@ -120,11 +122,11 @@ class Autoencoder(nn.Module):
         # device=None, dtype=None)
         self.conv1 = nn.Conv2d(1, 4, 3, padding=1)  #stride default is 1, kernal is 3, padding is 1
         self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
-        self.conv3 = nn.Conv2d(8, 16, 3, padding=1)
+        self.conv3 = nn.Conv2d(8, n_channels, 3, padding=1)
         #class torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size, 
         # stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1, 
         # padding_mode='zeros', device=None, dtype=None)[source]#
-        self.t_conv1 = nn.ConvTranspose2d(16, 8, 2, stride=2)
+        self.t_conv1 = nn.ConvTranspose2d(n_channels, 8, 2, stride=2)
         self.t_conv2 = nn.ConvTranspose2d(8, 4, 2, stride=2)
         self.t_conv3 = nn.ConvTranspose2d(4, 1, [3,2], stride=[3,2])
 
@@ -139,20 +141,21 @@ class Autoencoder(nn.Module):
         x = self.pool(x)
         x = torch.nn.functional.relu(self.conv3(x))
         x = self.pool(x)
-        x = x.view(-1,  nel_reduced)
+        #x = x.view(-1,  nel_reduced) #address this line - Daniel attempts to flatten the tensor into single feature vector
+        x = x.view(-1, 1,  nel_reduced) #address this line - Daniel attempts to flatten the tensor into single feature vector
         latent = torch.nn.functional.relu(self.fc1(x))
         x = torch.nn.functional.relu(self.fc2(latent))
-        x = x.view(-1, nrow_reduced, 1, ncol_reduced)
-       # x = x.view(-1, 16, 1, 9)
+        x = x.view(-1, n_channels, nrow_reduced, ncol_reduced)
+        #x = x.view(-1, nrow_reduced, 1, ncol_reduced)  #address this line - reshape back to image dimensions
+        #x = x.view(-1, 16, 1, 9)  # Daniel's code
         x = torch.nn.functional.relu(self.t_conv1(x))
         x = torch.nn.functional.relu(self.t_conv2(x))
         output = torch.sigmoid(self.t_conv3(x))
-        return output, latent
+        return output, latent # verify input and output dimensions are the same
 
 
 
 
-latent_dim = 16
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using {device} device")
 autoencoder = Autoencoder(latent_dim=latent_dim).to(device)
