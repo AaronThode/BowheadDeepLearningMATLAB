@@ -1,4 +1,4 @@
-%%%%%master_convert_manual_archive_to_spectrograms.m%%%
+%%%%%master_create_supervised_dataset.m%%%
 %
 %
 % Key points to remember when making spectrograms:
@@ -14,17 +14,17 @@ diary diary_output.txt
 DASAR_strings='ABCDEFG';
 GSI_file_dir='/Volumes/Shared/Data/';
 WAV_file_dir='/Volumes/Bowhead4/';
-data_file_type='WAV'; %'GSI' or 'WAV'
+data_file_type='GSI'; %'GSI' or 'WAV'
 Manual_record_files_dir='../Shell_Manual_Results';
 output_dir='../Spectrogram_Image_Database.dir';
 
 
-param.spec.debug_plot=false;
+%param.spec.debug_plot=false;
 
-debug.sec_to_load=6*60*60+1;
-debug.Iday_start=5;
-debug.Idasar_start=7;
-%debug.sec_to_load=Inf;
+%debug.sec_to_load=6*60*60+1;
+debug.Iday_start=1;
+debug.Idasar_start=1;
+debug.sec_to_load=Inf;
 write_files=true;
 
 year_want={'08','09','10','11','12','13','14'};
@@ -46,7 +46,7 @@ spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise r
 
 
 %%%Parameters for event detection
-param.event.dB_threshold = 20; % threshold above mean for detection
+param.event.dB_threshold = 5; % threshold above mean for detection
 param.event.image_scale_factor = 5;  % factor to multiply SNR by for saving as unit8 image
 param.event.fmin = 25;
 param.event.fmax = 475;
@@ -56,7 +56,7 @@ param.spec.ovlap=0.9;
 param.spec.image_scale_factor = param.event.image_scale_factor;
 param.spec.fmin = 0;
 param.spec.fmax = 500;
-param.spec.final_dims=8*[16 10];
+%param.spec.final_dims=8*[16 10];
 
 %Set up energy detector.  Example for bowhead whale analysis that monitors between 25 and 350 Hz,
 %  using a set of detectors with 37 Hz bandwidth.
@@ -74,8 +74,6 @@ param.energy.TolTime=0.5;  param.energy_desc{K}='Minimum time in seconds that mu
 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
 param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
 param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug information. 1:  SEL output.  2:  equalized background noise. 3: SNR.';K=K+1;
-
-
 
 nu=1.7;
 
