@@ -1,3 +1,24 @@
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments (do not commit)
+.venv/
+.venv*/
+venv/
+env/
+Pytorch_scripts/.venv/
+Pytorch_scripts/.venv*/
+
+# Large local datasets (do not commit)
+Spectrogram_Image_Database.dir/
+Pytorch_scripts/Spectrogram_Image_Database.dir/
+
+# Optional: ignore local experiment outputs (comment out to include)
+# *.log
 *.asv
 *.mat
 *.jpg
