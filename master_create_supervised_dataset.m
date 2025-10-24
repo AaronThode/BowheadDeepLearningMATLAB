@@ -12,14 +12,14 @@ clear
 !rm diary_output.txt
 diary diary_output.txt
 DASAR_strings='ABCDEFG';
-GSI_file_dir='/Volumes/Shared/Data/';
+GSI_file_dir='/Volumes/Shared-1/Data/';
 WAV_file_dir='/Volumes/Bowhead4/';
 data_file_type='GSI'; %'GSI' or 'WAV'
 Manual_record_files_dir='../Shell_Manual_Results';
 output_dir='../Spectrogram_Image_Database.dir';
 
 
-%param.spec.debug_plot=false;
+param.spec.debug_plot=false;
 
 %debug.sec_to_load=6*60*60+1;
 debug.Iday_start=1;
@@ -228,8 +228,9 @@ for Iyear=1:length(year_want)
                     %cd(sprintf('20%s',year_want{Iyear}));
                     %eval(sprintf('!mkdir Site%s',Site{Isite}));
                     %cd(sprintf('Site%s',Site{Isite}));
-                    !mkdir Bowhead_calls.dir
-                    !mkdir Other_sounds.dir
+                    %!mkdir Bowhead_calls.dir
+                    %!mkdir Other_sounds.dir
+                    !mkdir Unsupervised_images.dir
                     cd(mydir)
                     create_folder_flag=false;
                 end
@@ -287,7 +288,7 @@ for Iyear=1:length(year_want)
                         output_name(17:end)=temp(10:end);
                         output_name=sprintf('%s_Type%i',output_name,manual.call_type(I));
                        % output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
-                        output_name=[output_dir filesep  'Bowhead_calls.dir' filesep output_name '.mat'];
+                        output_name=[output_dir filesep  'Unsupervised_images.dir' filesep output_name '.mat'];
 
                         save(output_name,'SNR_gram','FF','TT');
                     end
@@ -369,7 +370,7 @@ for Iyear=1:length(year_want)
                              output_name(17:end)=temp(10:end);
                              output_name=sprintf('%s_Type%i',output_name,0);
                              %output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Other_sounds.dir' filesep output_name '.mat'];
-                             output_name=[output_dir filesep  'Other_sounds.dir' filesep output_name '.mat'];
+                             output_name=[output_dir filesep  'Unsupervised_images.dir' filesep output_name '.mat'];
 
                              save(output_name,'SNR_gram','FF','TT');
                          end
