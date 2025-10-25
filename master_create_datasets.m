@@ -1,7 +1,6 @@
 %%%%%master_create_supervised_dataset.m%%%
 %
-% Creates supervised or unsupervised datasets, although the manual
-%   annotations do not seem reliable.
+%
 % Key points to remember when making spectrograms:
 %       (1) They must be equalized;
 %       (2) If not equalized they must be calibrated by the DASAR
@@ -10,17 +9,21 @@
 
 close all
 clear
+addpath .
 !rm diary_output.txt
 diary diary_output.txt
 DASAR_strings='ABCDEFG';
-GSI_file_dir='/Volumes/Shared/Data/';
+GSI_file_dir='/Volumes/Shared-1/Data/';
+GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
 WAV_file_dir='/Volumes/Bowhead4/';
-data_file_type='WAV'; %'GSI' or 'WAV'
+data_file_type='GSI'; %'GSI' or 'WAV'
+
+code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software';
 Manual_record_files_dir='../Shell_Manual_Results';
 output_dir='../Spectrogram_Image_Database.dir';
+cd(code_dir)
 
-
-%param.spec.debug_plot=false;
+param.spec.debug_plot=false;
 
 %debug.sec_to_load=6*60*60+1;
 debug.Iday_start=1;
@@ -45,6 +48,7 @@ sound_type='whale'; %whale, seal
 chunk_sample=6*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
+
 
 %%%Parameters for event detection
 param.event.dB_threshold = 5; % threshold above mean for detection
@@ -89,9 +93,12 @@ elseif exist(WAV_file_dir,'dir')==7
     head_info=load('GSI_header_table.mat');
 end
 
-sample_count=0;  %%%Total number of images saved.
+sample_count.manual=0;
+mydir=pwd;
+
 for Iyear=1:length(year_want)
     for Isite=1:length(Site)
+        cd(mydir)
         for I=debug.Idasar_start:length(DASAR_strings)
             % DASAR_list{I}=['S314' strr(I) '0'];
             DASAR_list{I}=sprintf('S%s%s%s0',Site{Isite},year_want{Iyear},DASAR_strings(I));
@@ -138,7 +145,7 @@ for Iyear=1:length(year_want)
         create_folder_flag=true;  %Flag to check for output directory structure when a new year-site combo is started
         
         for Id=debug.Idasar_start:size(manual.ind.wgt,2)  %For each DASAR
-
+            cd(mydir)
             %keyboard
             fprintf('DASAR %s\n',DASAR_list{Id});
 
@@ -206,6 +213,34 @@ for Iyear=1:length(year_want)
 
             for Iday=debug.Iday_start:length(tabs_start_unique)
                 disp(datestr(tabs_start_unique(Iday)));
+                 cd(mydir)
+                 %%%Create directory structures and count files in current
+                 %%%directory
+                 %if Iday==debug.Iday_start && Id==debug.Idasar_start
+                 %mydir=pwd;
+                 cd(output_dir)
+                 eval(sprintf('!mkdir 20%s', year_want{Iyear}));
+                 cd(sprintf('20%s',year_want{Iyear}));
+                 eval(sprintf('!mkdir Site%s',Site{Isite}));
+                 cd(sprintf('Site%s',Site{Isite}));
+                 eval(sprintf('!mkdir Day_%s',datestr(tabs_start_unique(Iday),30)));
+                 cd(sprintf('Day_%s',datestr(tabs_start_unique(Iday),30)));
+
+
+                 %!mkdir Bowhead_calls.dir
+                 %!mkdir Other_sounds.dir
+                 !mkdir Manually_selected_bowhead_calls.dir
+                 !mkdir Manually_selected_bowhead_calls.dir/D1.dir
+
+                 !mkdir Event_sounds.dir
+                 !mkdir Event_sounds.dir/D1.dir
+
+
+                 cd('Manually_selected_bowhead_calls.dir/D1.dir')
+                 current_save_dir=pwd;
+                 current_file_count=length(dir('*mat'));
+
+                 %end
 
                 Ithis_day=find(tabs_start==tabs_start_unique(Iday));
                 fprintf('On this day there are %i manual detections.\n',length(Ithis_day));
@@ -222,19 +257,7 @@ for Iyear=1:length(year_want)
                 manual.fmax=fmax_all(Ithis_day);
 
 
-                %%%Create directory structure%%%%%%%
-                if create_folder_flag
-                    mydir=pwd;
-                    cd(output_dir)
-                    %eval(sprintf('!mkdir 20%s', year_want{Iyear}));
-                    %cd(sprintf('20%s',year_want{Iyear}));
-                    %eval(sprintf('!mkdir Site%s',Site{Isite}));
-                    %cd(sprintf('Site%s',Site{Isite}));
-                    !mkdir Bowhead_calls.dir
-                    !mkdir Other_sounds.dir
-                    cd(mydir)
-                    create_folder_flag=false;
-                end
+               
                
                 Ifile_want=find(contains(file_array, datestr(tabs_start_unique(Iday),30)));
                 if isempty(Ifile_want)
@@ -260,7 +283,6 @@ for Iyear=1:length(year_want)
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%Process and save all manual detections%%%%%%%%%%%%%%
 
                 disp('Starting manual spectrograms')
-
                 %Igood_org=Ipass(Igood);  %Ensure that we skipp the NaN..
                 %Itemp is associated with Igood, which is associated with tabs.
                 %Igood_org associated with original manual.ind.* fields
@@ -279,29 +301,53 @@ for Iyear=1:length(year_want)
                     param.spec.plot_fmax=manual.fmax(I);
                     param.spec.duration=manual.duration(I);
                     [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
-                    %if isempty(SNR_gram)
-                   %     keyboard
-                   % end
+                    if isempty(SNR_gram)
+                        disp('SNR_gram is empty')
+                        continue
+                    end
+                   
                     if write_files
                         output_name=file_array{Ifile_want}(1:(end-4));
                         tabs_mid=tabs_DASAR(Ithis_day(I))+datenum(0,0,0,0,0,tmid-manual.tsec(I));
                         temp=datestr(tabs_mid,30);
                         output_name(17:end)=temp(10:end);
                         output_name=sprintf('%s_Type%i',output_name,manual.call_type(I));
-                       % output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Bowhead_calls.dir' filesep output_name '.mat'];
-                        output_name=[output_dir filesep  'Bowhead_calls.dir' filesep output_name '.mat'];
+                        %final_output_dir=sprintf('%s%s20%s%sSite%s%sManually_selected_bowhead_calls.dir%sD%i.dir',output_dir,filesep,year_want{Iyear},filesep, ...
+                        %            Site{Isite},filesep,filesep,dir_count(Iyear,Isite,Id));
+                        %output_name=sprintf('%s%s%s.mat',final_output_dir,filesep,output_name);
+                        %output_name=sprintf('%s%sManually_selected_bowhead_calls.dir%sD%i%s%s.mat',output_dir,filesep,filesep,directory_index.manual,filesep,output_name);
 
-                        save(output_name,'SNR_gram','FF','TT');
-                        sample_count=sample_count+1;
-                        if sample_count>=max_files_per_directory
+                        while current_file_count>=max_files_per_directory
+                               Idump=str2double(current_save_dir(end-4));
+                               current_save_dir(end-4)=int2str(Idump+1);
+                               if ~exist(current_save_dir,'dir')
+                                eval(sprintf('!mkdir %s',current_save_dir))
+                               end
+                               cd(current_save_dir);
+                               fprintf('Changing to %s\n',current_save_dir);
+
+                               current_file_count=length(dir('*.mat'));
 
                         end
+                        if exist([output_name '.mat'],"file")>0  %if file already exists
+                            continue
+                        end
+                        current_file_count=current_file_count+1;
+                        save(output_name,'SNR_gram','FF','TT');
                        
-
+                    end
+                    if current_file_count~=length(dir('*.mat'))
+                        keyboard
                     end
                 end %I in Igood
 
                 disp('Finished manual spectrograms')
+
+                if write_files
+                    cd ../../Event_sounds.dir/D1.dir
+                    current_save_dir=pwd;
+                    current_file_count=length(dir('*mat'));
+                end
 
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%Energy Detector.m%%%%%%%
                 %%% Now generate false detections by a simple event
@@ -370,6 +416,9 @@ for Iyear=1:length(year_want)
 
                          [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 
+                         if isempty(SNR_gram)
+                             continue
+                         end
                          if write_files
                              output_name=file_array{Ifile_want}(1:(end-4));
                              tabs_mid=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid-detect.tstart(II));
@@ -377,9 +426,23 @@ for Iyear=1:length(year_want)
                              output_name(17:end)=temp(10:end);
                              output_name=sprintf('%s_Type%i',output_name,0);
                              %output_name=[output_dir filesep '20' year_want{Iyear} filesep 'Site' Site{Isite} filesep 'Other_sounds.dir' filesep output_name '.mat'];
-                             output_name=[output_dir filesep  'Other_sounds.dir' filesep output_name '.mat'];
+                             %output_name=[output_dir filesep  'Unsupervised_images.dir' filesep output_name '.mat'];
 
-                             save(output_name,'SNR_gram','FF','TT');
+                             while current_file_count>=max_files_per_directory
+                                 Idump=str2double(current_save_dir(end-4));
+                                 current_save_dir(end-4)=int2str(Idump+1);
+                                 if ~exist(current_save_dir,'dir')
+                                     eval(sprintf('!mkdir %s',current_save_dir))
+                                 end
+                                 cd(current_save_dir);
+                                 fprintf('Changing to %s\n',current_save_dir);
+                                 current_file_count=length(dir('*.mat'));
+
+                             end
+                             current_file_count=current_file_count+1;
+                             
+                             save([current_save_dir filesep output_name],'SNR_gram','FF','TT');
+                              
                          end
                      end %Idet
                    
