@@ -13,16 +13,28 @@ addpath .
 warning off
 !rm diary_output.txt
 diary diary_output.txt
+
+[~,hostname]=system('hostname');
+
 DASAR_strings='ABCDEFG';
-GSI_file_dir='/Volumes/Shared-1/Data/';
-GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
+
+if contains(hostname,'macmussel-2')
+    GSI_file_dir='/Volumes/Shared-1/Data/';
+    code_dir='/Users/thode/Projects/DeepLearningNPRBProject/Software';
+else
+    GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
+    code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software';
+end
+cd(code_dir)
+
 WAV_file_dir='/Volumes/Bowhead4/';
 data_file_type='GSI'; %'GSI' or 'WAV'
 
-code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software';
+
 Manual_record_files_dir='../Shell_Manual_Results';
 output_dir='../Spectrogram_Image_Database.dir';
-cd(code_dir)
+eval(sprintf('!mkdir %s',output_dir));
+
 
 param.spec.debug_plot=false;
 
@@ -342,8 +354,10 @@ for Iyear=1:length(year_want)
                             continue
                         end
                         current_file_count=current_file_count+1;
-                        save(output_name,'SNR_gram','FF','TT','bearing');
-                       
+                        dF=FF(2)-FF(1);dT=TT(2)-TT(1);
+                        save(output_name,'SNR_gram','dF','dT','bearing','tabs_mid');
+                        %database{Iyear,Isite,Id}.tabs=[]
+
                     end
                     if current_file_count~=length(dir('*.mat'))
                         keyboard
@@ -451,8 +465,8 @@ for Iyear=1:length(year_want)
 
                              end
                              current_file_count=current_file_count+1;
-                             
-                             save([current_save_dir filesep output_name],'SNR_gram','FF','TT','bearing');
+                             dF=FF(2)-FF(1);dT=TT(2)-TT(1);
+                             save(output_name,'SNR_gram','dF','dT','bearing','tabs_mid');
                               
                          end
                      end %Idet
