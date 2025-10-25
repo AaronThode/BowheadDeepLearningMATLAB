@@ -16,7 +16,7 @@ diary diary_output.txt
 
 [~,hostname]=system('hostname');
 
-DASAR_strings='ABCDEFG';
+DASAR_strings='ACG';
 
 if contains(hostname,'macmussel-2')
     GSI_file_dir='/Volumes/Shared-1/Data/';
@@ -41,7 +41,7 @@ param.spec.debug_plot=false;
 %debug.sec_to_load=6*60*60+1;
 debug.Iday_start=1;
 debug.Idasar_start=1;
-debug.sec_to_load=Inf;
+debug.sec_to_load=60*60+1;
 write_files=true;
 param.spec.compute_azimuth=true;
 max_files_per_directory=25000;
@@ -58,7 +58,7 @@ Site={'5'};
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=6*60*60;  %seconds
+chunk_sample=1*60*60;  %seconds
 file_len_sec=5; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=3; %length of final spectrogram clip. (data used for noise removed)
 sound_type='whale'; %whale, seal
@@ -158,20 +158,21 @@ for Iyear=1:length(year_want)
         %%%Loop through dates and create a selection file for each DASAR and day
         create_folder_flag=true;  %Flag to check for output directory structure when a new year-site combo is started
         
-        for Id=debug.Idasar_start:size(manual.ind.wgt,2)  %For each DASAR
+        for Id=debug.Idasar_start:length(DASAR_list)  %For each DASAR
             cd(mydir)
             %keyboard
             fprintf('DASAR %s\n',DASAR_list{Id});
 
+            I_manual_col=double(DASAR_strings(Id))-double('A')+1;  %%Allows DASAR_str to be any combinatino of letters
 
-            tabs_DASAR=datenum(1970,1,1,-8,0,manual.ind.ctime(:,Id)); %-8 converts from UTC time (archive) to local time (GSI WAV)
+            tabs_DASAR=datenum(1970,1,1,-8,0,manual.ind.ctime(:,I_manual_col)); %-8 converts from UTC time (archive) to local time (GSI WAV)
 
             Iexist=find(~isnan(tabs_DASAR));
             tabs_DASAR=tabs_DASAR(Iexist);
-            SIG_all=manual.ind.sigdb(Iexist,Id);
-            SNR_all=manual.ind.stndb(Iexist,Id);
-            fmin_all=manual.ind.flo(Iexist,Id);
-            fmax_all=manual.ind.fhi(Iexist,Id);
+            SIG_all=manual.ind.sigdb(Iexist,I_manual_col);
+            SNR_all=manual.ind.stndb(Iexist,I_manual_col);
+            fmin_all=manual.ind.flo(Iexist,I_manual_col);
+            fmax_all=manual.ind.fhi(Iexist,I_manual_col);
             call_type=call_type_all(Iexist);
 
             temp=datevec(tabs_DASAR);
@@ -261,7 +262,7 @@ for Iyear=1:length(year_want)
                 manual.tabs=tabs_DASAR(Ithis_day);
                 manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
                 manual.tsec=manual.tsec*(1+head.tdrift/86400);
-                manual.duration=manual.ind.duration(Iexist(Ithis_day),Id);
+                manual.duration=manual.ind.duration(Iexist(Ithis_day),I_manual_col);
                 manual.tmid=manual.tsec+0.5*manual.duration;
                 manual.tend=manual.tsec+manual.duration;
                 manual.SNR=SNR_all(Ithis_day);

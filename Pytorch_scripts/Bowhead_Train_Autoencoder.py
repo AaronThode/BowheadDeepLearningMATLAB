@@ -183,22 +183,22 @@ for epoch in range(num_epochs):
     num_val_batches = len(val_dataloader)
 
     #train autoencoder
-    autoencoder.train()
-    for data in train_dataloader:
-        data = data.to(device)
+    autoencoder.train() #sets to train mode, important for batch normalization and dropout layers
+    for images in train_dataloader:
+        images = images.to(device)
         optimizer.zero_grad()
-        outputs, latent = autoencoder(data.float())  
-        loss = criterion(outputs, data.float())
+        outputs, latent = autoencoder(images.float())  
+        loss = criterion(outputs, images.float())
         loss.backward()
         optimizer.step()
 
     #calculate training loss
     autoencoder.eval()
     with torch.no_grad():
-        for data in train_dataloader:
-            data = data.to(device)
-            train_outputs, _ = autoencoder(data.float())  
-            train_loss = criterion(train_outputs, data.float())
+        for images in train_dataloader:
+            images = images.to(device)
+            train_outputs, _ = autoencoder(images.float())  
+            train_loss = criterion(train_outputs, images.float())
             train_loss_total += train_loss.item()
 
     #calculate validation loss
@@ -233,8 +233,8 @@ total_len = len(dataloader.dataset)
 latent = torch.zeros((total_len, latent_dim), device=device)
 with torch.no_grad():
     start_idx = 0
-    for i_batch, data in enumerate(dataloader):
-        _ , latent_tmp = autoencoder(data.float().to(device))
+    for i_batch, images in enumerate(dataloader):
+        _ , latent_tmp = autoencoder(images.float().to(device))
         end_idx = start_idx + len(latent_tmp)
         latent[start_idx:end_idx] = latent_tmp
         start_idx = end_idx
