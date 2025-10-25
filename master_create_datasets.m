@@ -26,11 +26,11 @@ cd(code_dir)
 param.spec.debug_plot=false;
 
 %debug.sec_to_load=6*60*60+1;
-debug.Iday_start=5;
+debug.Iday_start=3;
 debug.Idasar_start=1;
 debug.sec_to_load=1*60*60;
 write_files=true;
-param.spec.compute_azimuth=false;
+param.spec.compute_azimuth=true;
 max_files_per_directory=25000;
 
 year_want={'08','09','10','11','12','13','14'};

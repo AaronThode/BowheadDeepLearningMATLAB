@@ -1,6 +1,6 @@
 function [BB_int,F,T,median_raw]=create_normalized_spectrogram(y,Fs,spectrogram_len_sec,param)
 
-param.debug_plot=false;
+param.debug_plot=true;
 param.num_blobs=3;
 param.blob_size=5;
 %t1=tic;
@@ -82,7 +82,7 @@ if size(y,2)>1
         subplot(3,2,4)
         imagesc(T,F,Igood);title(sprintf('top %i blobs',param.num_blobs));axis xy;colorbar
         subplot(3,2,5)
-        imagesc(T,F,Igood.*azi_gram);title('filtered for top blobs');axis xy;colorbar;%clim([5 30]);colorbar
+        imagesc(T,F,Igood.*azi_gram);title('filtered for top blobs');axis xy;colorbar;clim([0 360]);colorbar
 
         stats=regionprops(Wght>param.blob_size,'Area');Area=[stats.Area];
         subplot(6,2,10);plot(Area,'x');grid on;ylabel('Area(pixels)');%xlabel('Blob index')
