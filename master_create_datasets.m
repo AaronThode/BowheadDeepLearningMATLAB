@@ -26,10 +26,11 @@ cd(code_dir)
 param.spec.debug_plot=false;
 
 %debug.sec_to_load=6*60*60+1;
-debug.Iday_start=1;
+debug.Iday_start=5;
 debug.Idasar_start=1;
-debug.sec_to_load=Inf;
+debug.sec_to_load=1*60*60;
 write_files=true;
+param.spec.compute_azimuth=false;
 max_files_per_directory=25000;
 
 year_want={'08','09','10','11','12','13','14'};
@@ -39,7 +40,6 @@ year_want={'10'};
 Site={'5'};
 
 
-sound_type='whale'; %whale, seal
 
 %%%% Seconds of data to convert to spectrogram to conserve RAM memory.
 %%%%   Duration should be short enough that background noise not expected
@@ -48,6 +48,7 @@ sound_type='whale'; %whale, seal
 chunk_sample=6*60*60;  %seconds
 file_len_sec=10; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
+sound_type='whale'; %whale, seal
 
 
 %%%Parameters for event detection
@@ -74,7 +75,7 @@ param.energy.fhi_det=param.event.fmax;
 param.energy.burn_in_time=0.25;  %Time in minutes
 param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
-param.energy.threshold=5;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
+param.energy.threshold=param.event.dB_threshold;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
 param.energy.TolTime=0.5;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
 param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
@@ -269,7 +270,14 @@ for Iyear=1:length(year_want)
                 fprintf('Reading %s\n',file_array{Ifile_want});
                 tic
                 if strcmpi(data_file_type,'gsi')
-                    [x,~,head]=readgsi_omni_only([dir_want filesep file_array{Ifile_want}],0,debug.sec_to_load);
+                    if param.spec.compute_azimuth
+                        
+                        [x,~,head]=readgsi([dir_want filesep file_array{Ifile_want}],0,debug.sec_to_load,'native');
+                        x=x';
+                        param.spec.brefa=head.brefa;
+                    else
+                        [x,~,head]=readgsi_omni_only([dir_want filesep file_array{Ifile_want}],0,debug.sec_to_load);
+                    end
                     x=x-2^15;
 
                 else 
@@ -290,7 +298,7 @@ for Iyear=1:length(year_want)
                 for I=1:length(Ithis_day)
                     tmid=manual.tmid(I);
 
-                    if length(x)/head.Fs-tmid<=0
+                    if max(size(x))/head.Fs-tmid<=0
                         continue
                     end
 
@@ -300,7 +308,7 @@ for Iyear=1:length(year_want)
                     param.spec.plot_fmin=manual.fmin(I);
                     param.spec.plot_fmax=manual.fmax(I);
                     param.spec.duration=manual.duration(I);
-                    [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                    [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                     if isempty(SNR_gram)
                         disp('SNR_gram is empty')
                         continue
@@ -333,7 +341,7 @@ for Iyear=1:length(year_want)
                             continue
                         end
                         current_file_count=current_file_count+1;
-                        save(output_name,'SNR_gram','FF','TT');
+                        save(output_name,'SNR_gram','FF','TT','bearing');
                        
                     end
                     if current_file_count~=length(dir('*.mat'))
@@ -359,11 +367,11 @@ for Iyear=1:length(year_want)
                 %chunk_sample=60;
 
 
-                Nchunks=floor(length(x)/(chunk_sample*head.Fs));
+                Nchunks=floor(max(size(x))/(chunk_sample*head.Fs));
                 for Ichunk=1:Nchunks
                     fprintf('Chunk %i of %i in DASAR %s in day %s\n',Ichunk,Nchunks,DASAR_list{Id},datestr(tabs_start_unique(Iday)));
                     Iss=1+(Ichunk-1)*chunk_sample*head.Fs;
-                    x_chunk=x(Iss:(Iss-1+chunk_sample*head.Fs));
+                    x_chunk=x(Iss:(Iss-1+chunk_sample*head.Fs),1);
 
 
                     param.energy.debug=false;
@@ -414,7 +422,7 @@ for Iyear=1:length(year_want)
                          param.spec.plot_fmax=detect.fmax(II);
                          param.spec.duration=detect.duration(II);
 
-                         [SNR_gram,FF,TT]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                         [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x(:,1),head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
 
                          if isempty(SNR_gram)
                              continue
@@ -441,7 +449,7 @@ for Iyear=1:length(year_want)
                              end
                              current_file_count=current_file_count+1;
                              
-                             save([current_save_dir filesep output_name],'SNR_gram','FF','TT');
+                             save([current_save_dir filesep output_name],'SNR_gram','FF','TT','bearing');
                               
                          end
                      end %Idet

@@ -1,4 +1,4 @@
-function [SNR_gram,FF,TT]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
+function [SNR_gram,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
 %[SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr)
 
 SNR_gram=[];TT=[];FF=[];
@@ -7,14 +7,14 @@ Ixx=round(Fs*(tsec_start+[0 file_len_sec]));
 
 Ixx(1)=max([1 (Ixx(1))]);
 Ixx(2)=min([length(x) Ixx(2)])-1;
-y=x(Ixx(1):Ixx(2));  %%signal snippet including background noise
+y=x(Ixx(1):Ixx(2),:);  %%signal snippet including background noise
 
 if length(y)~=Fs*file_len_sec
     disp('File length not right')
     return
 end
 
-[SNR_gram,FF,TT]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
+[SNR_gram,FF,TT,azi]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
 
 %%Ensure image dimensions are divisible by 8 to allow it to be close to
 %%NUWC 128 by 144 image
