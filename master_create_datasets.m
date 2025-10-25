@@ -10,6 +10,7 @@
 close all
 clear
 addpath .
+warning off
 !rm diary_output.txt
 diary diary_output.txt
 DASAR_strings='ABCDEFG';
@@ -26,9 +27,9 @@ cd(code_dir)
 param.spec.debug_plot=false;
 
 %debug.sec_to_load=6*60*60+1;
-debug.Iday_start=3;
+debug.Iday_start=1;
 debug.Idasar_start=1;
-debug.sec_to_load=1*60*60;
+debug.sec_to_load=Inf;
 write_files=true;
 param.spec.compute_azimuth=true;
 max_files_per_directory=25000;
@@ -46,8 +47,8 @@ Site={'5'};
 %%%%   to change...
 
 chunk_sample=6*60*60;  %seconds
-file_len_sec=10; %length of final file clip (includes noise estimate)
-spectrogram_len_sec=5; %length of final spectrogram clip. (data used for noise removed)
+file_len_sec=5; %length of final file clip (includes noise estimate)
+spectrogram_len_sec=3; %length of final spectrogram clip. (data used for noise removed)
 sound_type='whale'; %whale, seal
 
 
@@ -411,7 +412,7 @@ for Iyear=1:length(year_want)
                      %%%Created automated detections that are not whale calls%%%%%%%
                      param.spec.debug_plot=false;
                      for Idet=1:length(Idet_notWhale)
-
+                         if rem(Idet,500)==0, fprintf('%3.2f percent done\n',100*Idet/length(Idet_notWhale));end
                          II=Idet_notWhale(Idet);
                          tmid=0.5*(detect.tstart(II)+detect.tend(II));
                          titstr{1}=sprintf('Non-whale detection Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,Idet,length(Idet_notWhale));
@@ -422,7 +423,9 @@ for Iyear=1:length(year_want)
                          param.spec.plot_fmax=detect.fmax(II);
                          param.spec.duration=detect.duration(II);
 
-                         [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x(:,1),head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                         %[SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x(:,1),head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                         [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                   
 
                          if isempty(SNR_gram)
                              continue

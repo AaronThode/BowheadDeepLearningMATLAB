@@ -1,6 +1,6 @@
 function [BB_int,F,T,median_raw]=create_normalized_spectrogram(y,Fs,spectrogram_len_sec,param)
 
-param.debug_plot=true;
+param.debug_plot=false;
 param.num_blobs=3;
 param.blob_size=5;
 %t1=tic;
@@ -87,7 +87,7 @@ if size(y,2)>1
         stats=regionprops(Wght>param.blob_size,'Area');Area=[stats.Area];
         subplot(6,2,10);plot(Area,'x');grid on;ylabel('Area(pixels)');%xlabel('Blob index')
         % figure;
-        subplot(6,2,12);histogram(azi_gram(Igood));
+        subplot(6,2,12);histogram(azi_gram(Igood));xlim([0 360])
         title(sprintf('Raw: %6.2f, Compass %6.2f',median_raw,median_compass),'Interpreter','none')
         %keyboard
         pause;
