@@ -485,3 +485,4 @@ for Iyear=1:length(year_want)
         fprintf('Finished exporting this site and year.... \n\n\n')
     end %Isite
 end %Iyear
+cd(mydir)

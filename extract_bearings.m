@@ -1,10 +1,9 @@
-function [thet, kappa, sd, x] = extract_bearings(app, y, bufferTime, Nfft, Fs, fmin, fmax, Nsamples, f_transition)
-%function [thet,kappa,sd,x]=extract_bearings(y,bufferTime,Nfft,Fs,fmin,fmax,Nsamples)
+function [thet, kappa, sd, x] = extract_bearings(y, bufferTime, Fs, fmin, fmax, Nsamples, f_transition)
+%function [thet,kappa,sd,x]=extract_bearings(y,bufferTime,Fs,fmin,fmax,Nsamples)
 % Input:
 %    y: time series, with channels arranged as columns
 %    bufferTime: how much time exists before and after signal proper.
 %           Needed because time-domain filtering requires a signal buffer.
-%    Nfft: FFT size to use if CSDM is to be estimated.
 %    Fs: Sampling frequency, Hz
 %    fmin,fmax: minimum and maximum frequency of signal, Hz.
 %    algchc:  String containing one of three possibilities:
