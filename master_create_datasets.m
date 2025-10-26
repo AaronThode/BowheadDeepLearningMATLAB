@@ -16,7 +16,6 @@ diary diary_output.txt
 
 [~,hostname]=system('hostname');
 
-DASAR_strings='ACG';
 
 if contains(hostname,'macmussel-2')
     GSI_file_dir='/Volumes/Shared-1/Data/';
@@ -39,13 +38,15 @@ eval(sprintf('!mkdir %s',output_dir));
 param.spec.debug_plot=false;
 
 %debug.sec_to_load=6*60*60+1;
+
 debug.Iday_start=1;
 debug.Idasar_start=1;
-debug.sec_to_load=60*60+1;
+debug.sec_to_load=Inf;
 write_files=true;
 param.spec.compute_azimuth=true;
 max_files_per_directory=25000;
 
+DASAR_strings='ACG';
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
 
@@ -58,7 +59,7 @@ Site={'5'};
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=1*60*60;  %seconds
+chunk_sample=6*60*60;  %seconds
 file_len_sec=5; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=3; %length of final spectrogram clip. (data used for noise removed)
 sound_type='whale'; %whale, seal
@@ -86,12 +87,12 @@ param.energy.ovlap = 0.75;
 param.energy.flo_det=param.event.fmin;
 param.energy.fhi_det=param.event.fmax;
 param.energy.burn_in_time=0.25;  %Time in minutes
-param.energy.eq_time=5;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
+param.energy.eq_time=3;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
 param.energy.threshold=param.event.dB_threshold;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
-param.energy.TolTime=0.5;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
+param.energy.TolTime=0.1;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
 param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
-param.energy.MaxTime=5;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
+param.energy.MaxTime=10;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
 param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug information. 1:  SEL output.  2:  equalized background noise. 3: SNR.';K=K+1;
 
 nu=1.7;
