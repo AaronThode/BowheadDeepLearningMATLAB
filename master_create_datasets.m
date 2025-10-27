@@ -50,7 +50,7 @@ DASAR_strings='ACG';
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
 
-year_want={'10'};
+year_want={'14','10'};
 Site={'5'};
 
 
@@ -59,7 +59,7 @@ Site={'5'};
 %%%%   Duration should be short enough that background noise not expected
 %%%%   to change...
 
-chunk_sample=6*60*60;  %seconds
+chunk_sample=6*60*60-1;  %seconds
 file_len_sec=5; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=3; %length of final spectrogram clip. (data used for noise removed)
 sound_type='whale'; %whale, seal
@@ -69,7 +69,7 @@ sound_type='whale'; %whale, seal
 param.event.dB_threshold = 5; % threshold above mean for detection
 param.event.image_scale_factor = 5;  % factor to multiply SNR by for saving as unit8 image
 param.event.fmin = 25;
-param.event.fmax = 475;
+param.event.fmax = 500;
 
 param.spec.Nfft=256;
 param.spec.ovlap=0.9;
@@ -166,16 +166,16 @@ for Iyear=1:length(year_want)
             %keyboard
             fprintf('DASAR %s\n',DASAR_list{Id});
 
-            I_manual_col=double(DASAR_strings(Id))-double('A')+1;  %%Allows DASAR_str to be any combinatino of letters
+            %I_manual_col=double(DASAR_strings(Id))-double('A')+1;  %%Allows DASAR_str to be any combinatino of letters
 
-            tabs_DASAR=datenum(1970,1,1,-8,0,manual.ind.ctime(:,I_manual_col)); %-8 converts from UTC time (archive) to local time (GSI WAV)
+            tabs_DASAR=datenum(1970,1,1,-8,0,manual.ind.ctime(:,Id)); %-8 converts from UTC time (archive) to local time (GSI WAV)
 
             Iexist=find(~isnan(tabs_DASAR));
             tabs_DASAR=tabs_DASAR(Iexist);
-            SIG_all=manual.ind.sigdb(Iexist,I_manual_col);
-            SNR_all=manual.ind.stndb(Iexist,I_manual_col);
-            fmin_all=manual.ind.flo(Iexist,I_manual_col);
-            fmax_all=manual.ind.fhi(Iexist,I_manual_col);
+            SIG_all=manual.ind.sigdb(Iexist,Id);
+            SNR_all=manual.ind.stndb(Iexist,Id);
+            fmin_all=manual.ind.flo(Iexist,Id);
+            fmax_all=manual.ind.fhi(Iexist,Id);
             call_type=call_type_all(Iexist);
 
             temp=datevec(tabs_DASAR);
@@ -265,7 +265,7 @@ for Iyear=1:length(year_want)
                 manual.tabs=tabs_DASAR(Ithis_day);
                 manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
                 manual.tsec=manual.tsec*(1+head.tdrift/86400);
-                manual.duration=manual.ind.duration(Iexist(Ithis_day),I_manual_col);
+                manual.duration=manual.ind.duration(Iexist(Ithis_day),Id);
                 manual.tmid=manual.tsec+0.5*manual.duration;
                 manual.tend=manual.tsec+manual.duration;
                 manual.SNR=SNR_all(Ithis_day);

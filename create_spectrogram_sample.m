@@ -1,7 +1,7 @@
 function [SNR_gram,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
 %[SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr)
 
-SNR_gram=[];TT=[];FF=[];
+SNR_gram=[];TT=[];FF=[];azi=[];
 tsec_start=tmid-0.5*file_len_sec;
 Ixx=round(Fs*(tsec_start+[0 file_len_sec]));
 
