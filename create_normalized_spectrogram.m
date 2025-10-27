@@ -40,6 +40,7 @@ if size(y,2)>1
     NTV=output_array{2}(Ifreq,Indexx);
     T=T(Indexx);
     T=T-T(1);
+    F=F(Ifreq);
     Wght=SNR.*NTV.^2;
     %Igood=find(Wght(:)>5)
 
@@ -47,8 +48,6 @@ if size(y,2)>1
 
     Igood = bwpropfilt(Wght>param.blob_size,'Area',param.num_blobs);
     angs=azi_gram(Igood);
-
-
 
     median_raw=circ_median(angs(:)*pi/180)*180/pi;
     median_raw(median_raw<0)=median_raw(median_raw<0)+360;

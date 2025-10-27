@@ -74,28 +74,30 @@ param.event.fmax = 475;
 param.spec.Nfft=256;
 param.spec.ovlap=0.9;
 param.spec.image_scale_factor = param.event.image_scale_factor;
-param.spec.fmin = 0;
+param.spec.fmin = 25;
 param.spec.fmax = 500;
 %param.spec.final_dims=8*[16 10];
 
 %Set up energy detector.  Example for bowhead whale analysis that monitors between 25 and 350 Hz,
 %  using a set of detectors with 37 Hz bandwidth.
 K=1;
+%param.energy.eq_time=3;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
+param.energy.eq_time = 23.8;  %%Original choice
+param.energy.threshold=param.event.dB_threshold;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
+param.energy.TolTime=0.05;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
+param.energy.MinTime=0.1;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
+param.energy.MaxTime=10;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
+
 param.energy.Nfft=256;
 param.energy.Fs =1000;
 param.energy.ovlap = 0.75;
 param.energy.flo_det=param.event.fmin;
 param.energy.fhi_det=param.event.fmax;
 param.energy.burn_in_time=0.25;  %Time in minutes
-param.energy.eq_time=3;   param.energy_desc{K}='Equalization time (s): should be roughly twice the duration of signal of interest';K=K+1;
 param.energy.bandwidth=37;     param.energy_desc{K}='Bandwidth of sub-detector in kHz';K=K+1;
-param.energy.threshold=param.event.dB_threshold;  param.energy_desc{K}='Threshold in dB to accept a detection';K=K+1;
-param.energy.TolTime=0.1;  param.energy_desc{K}='Minimum time in seconds that must elapse for two detections to be listed as separate';K=K+1;
-param.energy.MinTime=0;     param.energy_desc{K}='Minimum time in seconds a required for a detection to be logged';K=K+1;
-param.energy.MaxTime=10;     param.energy_desc{K}= 'Maximum time in seconds a detection is permitted to have';K=K+1;
 param.energy.debug=0;       param.energy_desc{K}= '0: do not write out debug information. 1:  SEL output.  2:  equalized background noise. 3: SNR.';K=K+1;
 
-nu=1.7;
+        
 
 if strcmpi(data_file_type,'gsi')
     if exist(GSI_file_dir,'dir')==0
