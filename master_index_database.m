@@ -9,23 +9,31 @@ eval(sprintf('!mkdir %s/Trash.dir',database_folder));
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
 
-year_want={'10'};
+year_want={'14','10'};
 Site={'5'};
+
 DASAR_strings='ABCDEFG';
 day_want={'0815','0821','0829','0905','0913','0927'};
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
-SNR_gram_dims=[128 104];
+SNR_gram_dims=[121 104];
 
 param.interval_remove.debug=false;
 
 DASARs_counted=false;
+max_D_dirs=0;
+max_DASAR_strings='';
 for Iyear=1:length(year_want)
+    disp(year_want{Iyear});
     for Isite=1:length(Site)
+        disp(Site{Isite});
         for Iday=1:length(day_want)
+            disp(day_want{Iday});
             for Ifold=1:length(folder_names)
+                disp(folder_names{Ifold});
                 dir_string=sprintf('%s/20%s/Site%s/Day_20%s%sT000000/%s', ...
                     database_folder,year_want{Iyear},Site{Isite},year_want{Iyear},day_want{Iday},folder_names{Ifold});
                 DD_dirs=dir([dir_string '/D*dir']);
+                max_D_dirs=max([max_D_dirs length(DD_dirs)]);
                 for Idd=1:length(DD_dirs)
                     fnames=dir([dir_string '/' DD_dirs(Idd).name '/S*mat']);
                     Nfiles=length(fnames);
@@ -45,7 +53,8 @@ for Iyear=1:length(year_want)
                     for Ifile=1:Nfiles
                         temp=load([fnames(Ifile).folder filesep fnames(Ifile).name]);
                         if ~all(SNR_gram_dims==size(temp.SNR_gram))
-                            disp([fnames(Ifile).folder filesep fnames(Ifile).name 'SNR_gram not correct size:\n' size(temp.SNR_gram)]);
+                            disp([ fnames(Ifile).name ' SNR_gram not correct size:\n' size(temp.SNR_gram)]);
+                            keyboard
                             eval(sprintf('!mv %s/%s %s/Trash.dir',fnames(Ifile).folder,fnames(Ifile).name,database_folder));
                             continue
                         end
@@ -62,14 +71,19 @@ for Iyear=1:length(year_want)
                    
                     %%%Identify DASARs present
                     DASAR_ID=char(unique(index{Iyear,Isite,Iday,Ifold}.fname(:,5)));
+                    
+                    if length(DASAR_ID)>length(max_DASAR_strings)
+                        fprintf('new DASAR string is %s\n',DASAR_ID);
+                        max_DASAR_strings=DASAR_ID;
+                    end
                     if ~DASARs_counted
                         DASARs_counted=true;
 
-                        file_fraction.manual_all=zeros(length(year_want),length(Site),length(day_want),length(DASAR_ID),4);  %Last index is maximum number of 'D' folders expected.
+                        file_fraction.manual_all=zeros(length(year_want),length(Site),length(day_want),length(DASAR_ID),3);  %Last index is maximum number of 'D' folders expected.
                         file_fraction.auto_all=file_fraction.manual_all;
 
-                        file_fraction.manual_noairgun=zeros(length(year_want),length(Site),length(day_want),length(DASAR_ID),4);  %Last index is maximum number of 'D' folders expected.
-                        file_fraction.auto_noairgun=file_fraction.manual_noairgun;
+                       % file_fraction.manual_noairgun=zeros(length(year_want),length(Site),length(day_want),length(DASAR_ID),4);  %Last index is maximum number of 'D' folders expected.
+                        file_fraction.auto_noairgun=file_fraction.manual_all;
 
                     end
 
@@ -84,8 +98,11 @@ for Iyear=1:length(year_want)
                          end
                      end
 
-
+                     if Ifold==2
+                         continue
+                     end
                      %%%Optional search for airgun signals
+                     disp('Starting airgun detection');tic
                      param.interval_remove.ICItol=[0.5 1.00];  %How close does a candidate have to be to predicted ICI time? (sec)
                      param.interval_remove.ICI_range=[7 10;
                          10 42];
@@ -103,13 +120,14 @@ for Iyear=1:length(year_want)
                          index{Iyear,Isite,Iday,Ifold}.is_airgun(Iltr)=ICI;
 
                          Nfiles_DASAR=sum(ICI<1);
-                         if Ifold==1  %auto
-                             file_fraction.auto_noairgun(Iyear,Isite,Iday,Id,Idd)=Nfiles_DASAR;
-                         else  %manual calls
-                             file_fraction.manual_noairgun(Iyear,Isite,Iday,Id,Idd)=Nfiles_DASAR;
-                         end
+                         %  if Ifold==1  %auto
+                         file_fraction.auto_noairgun(Iyear,Isite,Iday,Id,Idd)=Nfiles_DASAR;
+                         %else  %manual calls
+                         %    file_fraction.manual_noairgun(Iyear,Isite,Iday,Id,Idd)=Nfiles_DASAR;
+                         %end
                      end %Id
-
+                     disp('Finished airgun detection');toc
+                    
                 end %Idd
 
             end %Ifold
@@ -119,7 +137,7 @@ end %Iyear
 
 file_fraction.auto_all=file_fraction.auto_all/sum(file_fraction.auto_all(:));
 file_fraction.manual_all=file_fraction.manual_all/sum(file_fraction.manual_all(:));
-file_fraction.manual_noairgun=file_fraction.manual_noairgun/sum(file_fraction.manual_noairgun(:));
+%file_fraction.manual_noairgun=file_fraction.manual_noairgun/sum(file_fraction.manual_noairgun(:));
 file_fraction.auto_noairgun=file_fraction.auto_noairgun/sum(file_fraction.auto_noairgun(:));
 
-save([database_folder '/Database_index.mat'],'index','file_fraction','year_want','Site','day_want','folder_names','SNR_gram_dims');
+save([database_folder '/Database_index.mat'],'index','file_fraction','year_want','Site','day_want','folder_names','SNR_gram_dims','max_DASAR_strings');
