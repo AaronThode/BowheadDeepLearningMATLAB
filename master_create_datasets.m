@@ -50,7 +50,7 @@ DASAR_strings='ACG';
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
 
-year_want={'14','10'};
+year_want={'08','10'};
 Site={'5'};
 
 
@@ -152,6 +152,9 @@ for Iyear=1:length(year_want)
 
         fieldnamess=fieldnames(manual.ind);
         %manual.ind.duration=manual.ind.duration(Itype,:);
+        %%%Sometimes the localized object is one shorter than the ind
+        %%%object.  So this is a safety check
+        Itype=Itype(Itype<=size(manual.ind.wgt,1));
         for JJ=1:length(fieldnamess)
             manual.ind.(fieldnamess{JJ})=manual.ind.(fieldnamess{JJ})(Itype,:);
         end
