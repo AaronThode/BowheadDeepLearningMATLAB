@@ -33,11 +33,14 @@ end
 
 SNR_gram=SNR_gram(Iff,Itt);TT=TT(Itt);FF=FF(Iff);
 
+%if ~isfield(param,'debug_max_tmid')
+%    param.debug_max_tmid=Inf;
+%end
 
-if param.debug_plot
+if param.debug_plot% & param.debug_max_tmid>tmid
     figure(1)
     subplot(2,1,1)
-    spectrogram(double(y),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
+    spectrogram(double(y(:,1)),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
     clim([0 30]);colorbar
     %title(sprintf('Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Itemp)))
     title(titstr{1})

@@ -18,9 +18,9 @@ Nsamples=5000;  %%Total data samples wanted in unsupervised database
 manual_fraction=0.50;  %%Fraction of samples that come from manual annotations
 include_airguns=true;  %%If true include spectrograms of likely airgun signals
 
-year_want={'14','10'};
+year_want={'10'};
 Site={'5'};
-DASAR_strings={'A','C','G'};
+DASAR_strings={'A','D','G'};
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
 
 %index{Iyear,Isite,Iday,Ifold,I_d_directory};  Note that results NOT
