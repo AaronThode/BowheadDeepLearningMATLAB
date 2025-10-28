@@ -72,7 +72,7 @@ for I=1:length(Iguns)
 
     %%Are there enough matching ICIs close to the value of the current ICI?
     if (Ipass-1)<param.Nstd
-        ICI_score(Iguns(I))=0;
+        ICI_score(Iguns(I))=0;  %%%Not an airgun
     else
         %disp('good');
     end
