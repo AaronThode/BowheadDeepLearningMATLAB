@@ -468,11 +468,11 @@ for Iyear=1:length(year_want)
                         param.spec.plot_fmax=detect.fmax(II);
                         param.spec.duration=detect.duration(II);
                         param.spec.debug_max_tmid=1*60;
-%                         if Idet<5
-%                             param.spec.debug_plot=true;
-%                         else
-%                             param.spec.debug_plot=false;
-%                         end
+                        if Idet<param.spec.debug_count
+                            param.spec.debug_plot=true;
+                        else
+                            param.spec.debug_plot=false;
+                        end
                         [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                         if isempty(SNR_gram)
                             continue

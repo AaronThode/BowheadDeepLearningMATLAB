@@ -184,6 +184,7 @@ for epoch in range(num_epochs):
 
     #train autoencoder
     autoencoder.train() #sets to train mode, important for batch normalization and dropout layers
+    running_loss = 0.0
     for images in train_dataloader:
         images = images.to(device)
         optimizer.zero_grad()
@@ -191,15 +192,21 @@ for epoch in range(num_epochs):
         loss = criterion(outputs, images.float())
         loss.backward()
         optimizer.step()
+        running_loss += loss.item()
+    epoch_loss = running_loss / num_train_batches
+   
 
     #calculate training loss
     autoencoder.eval()
+    running_loss_eval = 0.0
     with torch.no_grad():
         for images in train_dataloader:
             images = images.to(device)
             train_outputs, _ = autoencoder(images.float())  
             train_loss = criterion(train_outputs, images.float())
             train_loss_total += train_loss.item()
+    train_loss_avg = train_loss_total/num_train_batches
+
 
     #calculate validation loss
     with torch.no_grad():
@@ -209,7 +216,6 @@ for epoch in range(num_epochs):
             val_loss = criterion(val_outputs, val_data.float())
             val_loss_total += val_loss.item()
 
-    train_loss_avg = train_loss_total/num_train_batches
     val_loss_avg = val_loss_total/num_val_batches
     Losses.append(train_loss_avg)
     ValLosses.append(val_loss_avg)
