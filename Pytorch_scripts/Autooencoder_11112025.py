@@ -724,17 +724,51 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
     print("\nTraining improved model...")
     improved_losses = quick_train(improved_model, train_data, epochs=epochs, lr=lr, model_name="improved", progress_interval=progress_interval)
     
-    # Evaluate reconstructions on visualization subset
+    # Extract latent embeddings from ALL data for t-SNE
     improved_model.eval()
     if not improved_only:
         original_model.eval()
     
-    with torch.no_grad():
-        improved_recon, improved_latent = improved_model(data_tensor)
-        improved_recon = match_shape_center(improved_recon, (nrow, ncol))
-        if not improved_only:
-            original_recon, original_latent = original_model(data_tensor)
-            original_recon = match_shape_center(original_recon, (nrow, ncol))
+    if use_dataloader:
+        # Extract latent embeddings from entire dataset
+        print(f"\nExtracting latent embeddings from all {len(dataset)} samples for t-SNE...")
+        all_latent = []
+        all_labels_list = []
+        
+        with torch.no_grad():
+            for i, (sample, label) in enumerate(dataset):
+                sample_batch = sample.unsqueeze(0)  # Add batch dimension
+                _, latent = improved_model(sample_batch)
+                all_latent.append(latent.cpu())
+                all_labels_list.append(label)
+                
+                if (i + 1) % 5000 == 0:
+                    print(f"  Processed {i + 1}/{len(dataset)} samples...")
+        
+        # Combine all latent vectors
+        improved_latent_full = torch.cat(all_latent, dim=0)
+        labels_full = np.array(all_labels_list)
+        print(f"Extracted {len(improved_latent_full)} latent embeddings")
+        
+        # Also compute reconstructions on visualization subset
+        with torch.no_grad():
+            improved_recon, improved_latent = improved_model(data_tensor)
+            improved_recon = match_shape_center(improved_recon, (nrow, ncol))
+            if not improved_only:
+                original_recon, original_latent = original_model(data_tensor)
+                original_recon = match_shape_center(original_recon, (nrow, ncol))
+    else:
+        # Pre-loaded tensor mode: use existing approach
+        with torch.no_grad():
+            improved_recon, improved_latent = improved_model(data_tensor)
+            improved_recon = match_shape_center(improved_recon, (nrow, ncol))
+            if not improved_only:
+                original_recon, original_latent = original_model(data_tensor)
+                original_recon = match_shape_center(original_recon, (nrow, ncol))
+        
+        # Use the same data for t-SNE
+        improved_latent_full = improved_latent
+        labels_full = labels if labels is not None else None
     
     # Convert tensor to numpy for visualization
     data_np = data_tensor.squeeze(1).numpy()  # Remove channel dimension for plotting
@@ -815,7 +849,16 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
         plt.show()
         # Latent t-SNE visualization for improved-only mode with simple clustering
         try:
-            imp_z = improved_latent.detach().cpu().numpy()
+            # Use full dataset embeddings if available, otherwise visualization subset
+            if 'improved_latent_full' in locals() and improved_latent_full is not None:
+                imp_z = improved_latent_full.detach().cpu().numpy()
+                labels_for_tsne = labels_full
+                print(f"\nComputing t-SNE on {len(imp_z)} samples from full dataset...")
+            else:
+                imp_z = improved_latent.detach().cpu().numpy()
+                labels_for_tsne = labels
+                print(f"\nComputing t-SNE on {len(imp_z)} samples from visualization subset...")
+            
             n = imp_z.shape[0]
             if n >= 2:
                 # Choose a safe perplexity (< number of samples)
@@ -846,11 +889,11 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
                     emb = Xc @ Vt[:2].T
 
                 # Create visualization: if we have labels, show both true labels and clusters
-                if has_labels and labels is not None:
+                if has_labels and labels_for_tsne is not None:
                     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
                     
                     # Plot 1: Colored by true dataset source
-                    colors_true = ['#1f77b4' if l == 0 else '#ff7f0e' for l in labels]
+                    colors_true = ['#1f77b4' if l == 0 else '#ff7f0e' for l in labels_for_tsne]
                     ax1.scatter(emb[:, 0], emb[:, 1], c=colors_true, alpha=0.7, s=30)
                     ax1.set_title(f'Latent Space by Dataset Source (n={n})')
                     ax1.set_xlabel('t-SNE 1')
@@ -859,8 +902,8 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
                     # Custom legend
                     from matplotlib.patches import Patch
                     legend_elements = [
-                        Patch(facecolor='#1f77b4', label=f'Airguns (n={np.sum(labels==0)})'),
-                        Patch(facecolor='#ff7f0e', label=f'Whale Calls (n={np.sum(labels==1)})')
+                        Patch(facecolor='#1f77b4', label=f'Airguns (n={np.sum(labels_for_tsne==0)})'),
+                        Patch(facecolor='#ff7f0e', label=f'Whale Calls (n={np.sum(labels_for_tsne==1)})')
                     ]
                     ax1.legend(handles=legend_elements, loc='best')
                     
@@ -895,9 +938,9 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
                     plt.show()
                     
                     # Compute separation metric
-                    if len(np.unique(labels)) == 2:
-                        airgun_emb = emb[labels == 0]
-                        whale_emb = emb[labels == 1]
+                    if len(np.unique(labels_for_tsne)) == 2:
+                        airgun_emb = emb[labels_for_tsne == 0]
+                        whale_emb = emb[labels_for_tsne == 1]
                         if len(airgun_emb) > 0 and len(whale_emb) > 0:
                             airgun_center = airgun_emb.mean(0)
                             whale_center = whale_emb.mean(0)
