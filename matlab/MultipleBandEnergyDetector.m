@@ -10,7 +10,7 @@
 %
 %   Nfft, Fs:
 %   EqFormat:  'dB' or 'linear' for equalization function
-%
+%   ovlap: 0.75 is 75 percent overlap between FFTs.
 %   burn_in_time: Time in minutes to build up equalization model.
 %
 %   flo_det, fhi_det:  The absolute minimum and maximum frequencies
