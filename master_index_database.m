@@ -22,7 +22,7 @@
 close all
 clear
 
-database_folder='../../Spectrogram_Image_Database.dir';
+database_folder='../Spectrogram_Image_Database.dir';
 eval(sprintf('!mkdir %s/Trash.dir',database_folder));
 
 %%%These variables should match those used for master_create_datasets.m
