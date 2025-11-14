@@ -24,10 +24,10 @@ Pytorch_scripts/Spectrogram_Image_Database.dir/
 *.jpg
 *.txt
 
-# Ignore PyTorch model outputs
+# Ignore PyTorch model outputs and training artifacts
 Autoencoder_v*/
 *.dir/
-models/*.pth
-plots/*.dir/
+models/
+plots/
 runs/
 
