@@ -1,20 +1,20 @@
-function [SNR_gram,FF,TT]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
+function [SNR_gram,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
 %[SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr)
 
-SNR_gram=[];TT=[];FF=[];
+SNR_gram=[];TT=[];FF=[];azi=[];
 tsec_start=tmid-0.5*file_len_sec;
 Ixx=round(Fs*(tsec_start+[0 file_len_sec]));
 
 Ixx(1)=max([1 (Ixx(1))]);
 Ixx(2)=min([length(x) Ixx(2)])-1;
-y=x(Ixx(1):Ixx(2));  %%signal snippet including background noise
+y=x(Ixx(1):Ixx(2),:);  %%signal snippet including background noise
 
 if length(y)~=Fs*file_len_sec
     disp('File length not right')
     return
 end
 
-[SNR_gram,FF,TT]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
+[SNR_gram,FF,TT,azi]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
 
 %%Ensure image dimensions are divisible by 8 to allow it to be close to
 %%NUWC 128 by 144 image
@@ -33,11 +33,14 @@ end
 
 SNR_gram=SNR_gram(Iff,Itt);TT=TT(Itt);FF=FF(Iff);
 
+%if ~isfield(param,'debug_max_tmid')
+%    param.debug_max_tmid=Inf;
+%end
 
-if param.debug_plot
+if param.debug_plot% & param.debug_max_tmid>tmid
     figure(1)
     subplot(2,1,1)
-    spectrogram(double(y),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
+    spectrogram(double(y(:,1)),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
     clim([0 30]);colorbar
     %title(sprintf('Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Itemp)))
     title(titstr{1})
