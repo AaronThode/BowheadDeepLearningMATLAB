@@ -25,7 +25,9 @@ Pytorch_scripts/Spectrogram_Image_Database.dir/
 *.txt
 
 # Ignore PyTorch model outputs
-Autoencoder_v*
+Autoencoder_v*/
 *.dir/
 models/*.pth
 plots/*.dir/
+runs/
+
