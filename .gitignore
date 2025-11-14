@@ -23,3 +23,9 @@ Pytorch_scripts/Spectrogram_Image_Database.dir/
 *.mat
 *.jpg
 *.txt
+
+# Ignore PyTorch model outputs
+Autoencoder_v*
+*.dir/
+models/*.pth
+plots/*.dir/
