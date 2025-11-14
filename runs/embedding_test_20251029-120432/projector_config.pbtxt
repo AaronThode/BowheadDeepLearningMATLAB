@@ -1,9 +1,0 @@
-embeddings {
-  tensor_name: "Test/Embedding:00000"
-  sprite {
-    image_path: "00000/Test%2fEmbedding/sprite.png"
-    single_image_dim: 64
-    single_image_dim: 64
-  }
-  tensor_path: "00000/Test%2fEmbedding/tensors.tsv"
-}
