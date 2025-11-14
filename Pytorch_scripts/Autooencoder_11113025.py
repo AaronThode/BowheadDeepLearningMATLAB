@@ -8,9 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import glob
+import math
 import torch.nn.functional as F
 from scipy.io import loadmat, savemat
 from torch.utils.data import Dataset, DataLoader
+from datetime import datetime
 try:
     from sklearn.manifold import TSNE  # optional; fallback to PCA if unavailable
     from sklearn.cluster import KMeans  # optional; for clustering
@@ -27,9 +29,14 @@ LATENT_DIM_DEFAULT = 128
 # Default seed for deterministic file selection and initialization
 SEED_DEFAULT = 42
 # Default training epochs used by both models unless overridden via CLI
-EPOCHS_DEFAULT = 80
-# Enable extra convolutional layer for deeper feature extraction
-EXTRA_CONV_DEFAULT = True
+EPOCHS_DEFAULT = 60
+# Enable extra 4th convolutional layer for deeper feature extraction
+EXTRA_CONV_DEFAULT = False
+# Default number of samples to render into JPEG panels
+NUMBER_OUTPUT_IMAGE_SAMPLES = 200
+# Columns per JPEG panel (each column is one spectrogram)
+PANEL_GROUP_SIZE = 10
+DEFAULT_VERSION_TAG = "01"
 
 def set_global_seed(seed: int):
     "Best-effort determinism across Python, NumPy, and PyTorch."
@@ -45,48 +52,87 @@ def set_global_seed(seed: int):
     except Exception:
         pass
 
-# Recreate the problematic original autoencoder
-class OriginalAutoencoder(nn.Module):
-    def __init__(self, nrow=121, ncol=104, latent_dim=LATENT_DIM_DEFAULT, n_channels=CHANNELS_DEFAULT):
-        super().__init__()
-        self.nrow, self.ncol = nrow, ncol
-        nrow_reduced = int(nrow / 8)
-        ncol_reduced = int(ncol / 8) 
-        nel_reduced = nrow_reduced * ncol_reduced * n_channels
-        
-        # Original architecture from NWIC script
-        c1 = max(4, n_channels // 4)
-        c2 = max(8, n_channels // 2)
-        self.conv1 = nn.Conv2d(1, c1, 3, padding=1)
-        self.conv2 = nn.Conv2d(c1, c2, 3, padding=1)
-        self.conv3 = nn.Conv2d(c2, n_channels, 3, padding=1)
-        self.t_conv1 = nn.ConvTranspose2d(n_channels, c2, 2, stride=2)
-        self.t_conv2 = nn.ConvTranspose2d(c2, c1, 2, stride=2)
-        self.t_conv3 = nn.ConvTranspose2d(c1, 1, [2, 2], stride=[2, 2], output_padding=(1, 0))
-        self.fc1 = nn.Linear(nel_reduced, latent_dim)
-        self.fc2 = nn.Linear(latent_dim, nel_reduced)
-        self.pool = nn.MaxPool2d(2, 2)
-        
-        self.nel_reduced = nel_reduced
-        self.nrow_reduced = nrow_reduced
-        self.ncol_reduced = ncol_reduced
-        self.n_channels = n_channels
 
-    def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = self.pool(x)
-        x = torch.relu(self.conv2(x))
-        x = self.pool(x)
-        x = torch.relu(self.conv3(x))
-        x = self.pool(x)
-        x = x.view(-1, self.nel_reduced)
-        latent = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(latent))
-        x = x.view(-1, self.n_channels, self.nrow_reduced, self.ncol_reduced)
-        x = torch.relu(self.t_conv1(x))
-        x = torch.relu(self.t_conv2(x))
-        output = torch.sigmoid(self.t_conv3(x))  # potential issue: Sigmoid constraint
-        return output, latent
+def create_output_directory(version_tag: str | None = None) -> str:
+    """Create and return the unique output directory for this run."""
+    tag = (version_tag or DEFAULT_VERSION_TAG).strip().replace(' ', '_')
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dir_name = f"Autoencoder_v{tag}_Date{timestamp}.dir"
+    output_dir = os.path.join(os.getcwd(), dir_name)
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def select_samples_for_outputs(dataset: Dataset | None, data_tensor: torch.Tensor | None,
+                               n_samples: int, seed: int | None) -> torch.Tensor:
+    """Select up to n_samples spectrograms for JPEG export."""
+    if (dataset is None or len(dataset) == 0) and (data_tensor is None or data_tensor.shape[0] == 0):
+        raise RuntimeError("No data available for output sampling")
+    rng = np.random.default_rng(seed)
+    if dataset is not None and len(dataset) > 0:
+        total = len(dataset)
+        k = min(n_samples, total)
+        indices = rng.choice(total, size=k, replace=False) if total > k else np.arange(total)
+        samples = []
+        for idx in indices:
+            sample, _ = dataset[int(idx)]
+            samples.append(sample.unsqueeze(0))
+        return torch.cat(samples, dim=0).float()
+    # Fall back to in-memory tensor (already shaped [N, 1, H, W])
+    total = data_tensor.shape[0]
+    k = min(n_samples, total)
+    if k <= 0:
+        raise RuntimeError("Data tensor is empty; cannot sample outputs")
+    indices = rng.choice(total, size=k, replace=False) if total > k else np.arange(total)
+    stacked = torch.stack([data_tensor[int(i)] for i in indices], dim=0)
+    return stacked.float()
+
+
+def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_dir: str,
+                               target_hw: tuple[int, int], base_name: str = "recon_panel",
+                               dataset_label: str = "") -> int:
+    """Save JPEG panels for original, reconstruction, and error across the provided samples.
+
+    Returns the number of panel files written.
+    """
+    if samples is None or samples.shape[0] == 0:
+        return 0
+    os.makedirs(output_dir, exist_ok=True)
+    num_samples = samples.shape[0]
+    group_count = math.ceil(num_samples / PANEL_GROUP_SIZE)
+    panels_written = 0
+    for group_idx in range(group_count):
+        start = group_idx * PANEL_GROUP_SIZE
+        end = min(start + PANEL_GROUP_SIZE, num_samples)
+        batch = samples[start:end]
+        with torch.no_grad():
+            recon, _ = model(batch)
+            recon = match_shape_center(recon, target_hw)
+        orig_np = batch.squeeze(1).cpu().numpy()
+        recon_np = recon.squeeze(1).cpu().numpy()
+        diff_np = np.abs(orig_np - recon_np)
+        cols = recon_np.shape[0]
+        fig, axes = plt.subplots(3, cols, figsize=(3 * cols, 9))
+        if cols == 1:
+            axes = np.expand_dims(axes, axis=1)
+        for col in range(cols):
+            axes[0, col].imshow(orig_np[col], cmap='viridis', origin='lower', aspect='auto')
+            axes[0, col].set_title(f'Input {start + col + 1}')
+            axes[0, col].axis('off')
+            axes[1, col].imshow(recon_np[col], cmap='viridis', origin='lower', aspect='auto')
+            axes[1, col].set_title('Recon')
+            axes[1, col].axis('off')
+            axes[2, col].imshow(diff_np[col], cmap='hot', origin='lower', aspect='auto')
+            axes[2, col].set_title('Error')
+            axes[2, col].axis('off')
+        if dataset_label:
+            plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
+        panel_path = os.path.join(output_dir, f"{base_name}_{group_idx + 1:03d}.jpg")
+        plt.tight_layout()
+        plt.savefig(panel_path, dpi=200, bbox_inches='tight')
+        plt.close(fig)
+        panels_written += 1
+    return panels_written
 
 # Improved autoencoder without sigmoid
 class ImprovedAutoencoder(nn.Module):
@@ -224,13 +270,17 @@ class ImprovedAutoencoder(nn.Module):
         output = self.decoder(x_recon)
         return output, latent
 
-def _minmax_norm(im: np.ndarray) -> np.ndarray:
+def _minmax_norm(im: np.ndarray, auto_skip_if_unit: bool = True) -> np.ndarray:
+    """Min-max normalize unless data already resides in [0, 1]."""
     im = im.astype(np.float32)
     im_min = float(np.min(im))
     im_max = float(np.max(im))
-    if im_max - im_min < 1e-8:
+    rng = im_max - im_min
+    if rng < 1e-8:
         return np.zeros_like(im, dtype=np.float32)
-    return (im - im_min) / (im_max - im_min)
+    if auto_skip_if_unit and (-1e-4 <= im_min <= 1.0 + 1e-4) and (-1e-4 <= im_max <= 1.0 + 1e-4):
+        return im
+    return (im - im_min) / rng
 
 class CombinedSNRDataset(Dataset):
     """
@@ -532,12 +582,13 @@ def match_shape_center(recon: torch.Tensor, target_hw: tuple[int, int]) -> torch
 def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 8, normalize: bool = True,
                                     latent_dim: int = LATENT_DIM_DEFAULT, channels: int = CHANNELS_DEFAULT,
                                     seed: int | None = SEED_DEFAULT, show_files: bool = False,
-                                    improved_only: bool = False,
                                     epochs: int = EPOCHS_DEFAULT, lr: float = 1e-3, progress_interval: int | None = None,
                                     k_clusters: int = 2, tsne_perplexity: float | None = None,
                                     tsne_samples: int | None = None, extra_conv: bool = EXTRA_CONV_DEFAULT,
-                                    load_all: bool = False, batch_size: int = 32):
-    """Compare original vs improved autoencoder on real SNR_gram data from folder(s).
+                                    load_all: bool = False, batch_size: int = 32,
+                                    output_samples: int = NUMBER_OUTPUT_IMAGE_SAMPLES,
+                                    version_tag: str = DEFAULT_VERSION_TAG):
+    """Train and visualize the improved autoencoder on real SNR_gram data from folder(s).
     
     Args:
         data_dir: Single directory path (str) or list of directories for combined dataset
@@ -549,12 +600,21 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
     # Ensure deterministic behavior for initialization and any stochastic ops
     if seed is not None:
         set_global_seed(int(seed))
+    output_dir = create_output_directory(version_tag)
+    print(f"Run artifacts will be stored in: {output_dir}")
     
     # Handle single vs multiple directories
     use_dataloader = False
     data_tensor = None
     train_loader = None
     dataset = None
+    
+    # Derive dataset label for plot annotations
+    single_dir_path: str | None = None
+    if isinstance(data_dir, list):
+        dataset_label = ", ".join([os.path.basename(d.rstrip('/')) for d in data_dir])
+    else:
+        dataset_label = os.path.basename(data_dir.rstrip('/'))
     
     if isinstance(data_dir, list):
         print(f"Loading SNR_gram data from {len(data_dir)} directories:")
@@ -597,6 +657,7 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
         has_labels = True
     else:
         print(f"Loading SNR_gram data from: {data_dir}")
+        single_dir_path = data_dir
         data = load_snrgrams_from_folder(data_dir, n_samples=n_samples, normalize=normalize,
                                          seed=seed, show_files=show_files)
         data_tensor = torch.from_numpy(data).float().unsqueeze(1)  # Add channel dimension
@@ -617,13 +678,10 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
     
     print(f"Config -> latent_dim={latent_dim}, channels={channels}, extra_conv={extra_conv}, seed={seed}")
     
-    # Create models
+    # Create model
     nrow, ncol = data_tensor.shape[-2], data_tensor.shape[-1]
     improved_model = ImprovedAutoencoder(nrow=nrow, ncol=ncol, latent_dim=latent_dim, 
-                                        base_channels=channels, extra_conv=extra_conv)
-    if not improved_only:
-        original_model = OriginalAutoencoder(nrow=nrow, ncol=ncol, latent_dim=latent_dim, n_channels=channels)
-        print(f"Original model parameters: {sum(p.numel() for p in original_model.parameters()):,}")
+                                         base_channels=channels, extra_conv=extra_conv)
     print(f"Improved model parameters: {sum(p.numel() for p in improved_model.parameters()):,}")
     
     # Quick training function
@@ -706,8 +764,10 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
                         axes[1, i].set_title('Recon')
                         axes[1, i].axis('off')
                     plt.suptitle(f'{model_name} Recon Progress (epoch {epoch})')
+                    plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
                     plt.tight_layout()
-                    plt.savefig(f'{model_name}_progress_epoch{epoch:03d}.png', dpi=120)
+                    progress_path = os.path.join(output_dir, f'{model_name}_progress_epoch{epoch:03d}.png')
+                    plt.savefig(progress_path, dpi=120)
                     plt.close(fig)
                 except Exception:
                     pass
@@ -717,17 +777,14 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
     # Train models per configuration
     train_data = train_loader if use_dataloader else data_tensor
     
-    if not improved_only:
-        print("\nTraining original model...")
-        original_losses = quick_train(original_model, train_data, epochs=epochs, lr=lr, model_name="original", progress_interval=progress_interval)
-    
     print("\nTraining improved model...")
     improved_losses = quick_train(improved_model, train_data, epochs=epochs, lr=lr, model_name="improved", progress_interval=progress_interval)
+    model_path = os.path.join(output_dir, 'improved_autoencoder.pth')
+    torch.save(improved_model.state_dict(), model_path)
+    print(f"Saved trained model to {model_path}")
     
     # Extract latent embeddings from ALL data for t-SNE
     improved_model.eval()
-    if not improved_only:
-        original_model.eval()
     
     if use_dataloader:
         # Extract latent embeddings from entire dataset
@@ -754,21 +811,36 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
         with torch.no_grad():
             improved_recon, improved_latent = improved_model(data_tensor)
             improved_recon = match_shape_center(improved_recon, (nrow, ncol))
-            if not improved_only:
-                original_recon, original_latent = original_model(data_tensor)
-                original_recon = match_shape_center(original_recon, (nrow, ncol))
     else:
         # Pre-loaded tensor mode: use existing approach
         with torch.no_grad():
             improved_recon, improved_latent = improved_model(data_tensor)
             improved_recon = match_shape_center(improved_recon, (nrow, ncol))
-            if not improved_only:
-                original_recon, original_latent = original_model(data_tensor)
-                original_recon = match_shape_center(original_recon, (nrow, ncol))
         
-        # Use the same data for t-SNE
+        # Default to visualization subset, but attempt full-directory traversal for t-SNE
         improved_latent_full = improved_latent
         labels_full = labels if labels is not None else None
+
+        if single_dir_path is not None:
+            try:
+                tsne_dataset = CombinedSNRDataset([single_dir_path], normalize=normalize, seed=None, show_summary=False)
+                tsne_loader = DataLoader(tsne_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+                print(f"Computing latent embeddings for all {len(tsne_dataset)} samples in {single_dir_path}...")
+                tsne_latents = []
+                tsne_labels = []
+                with torch.no_grad():
+                    for batch_data, lbl in tsne_loader:
+                        _, latent_b = improved_model(batch_data)
+                        tsne_latents.append(latent_b.cpu())
+                        tsne_labels.extend(lbl.tolist())
+                if tsne_latents:
+                    improved_latent_full = torch.cat(tsne_latents, dim=0)
+                    labels_full = np.array(tsne_labels)
+                    print(f"t-SNE will use {len(improved_latent_full)} embeddings from the full dataset")
+                else:
+                    print("Warning: Failed to assemble any embeddings from the full dataset; using visualization subset instead.")
+            except Exception as e:
+                print(f"Warning: unable to build full-dataset embeddings for t-SNE ({e}); falling back to visualization subset.")
     
     # Convert tensor to numpy for visualization
     data_np = data_tensor.squeeze(1).numpy()  # Remove channel dimension for plotting
@@ -777,259 +849,191 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
     print(f"\nValue ranges:")
     print(f"  Input data: [{data_np.min():.4f}, {data_np.max():.4f}]")
     print(f"  Improved recon: [{improved_recon.min():.4f}, {improved_recon.max():.4f}]")
-    if not improved_only:
-        print(f"  Original recon: [{original_recon.min():.4f}, {original_recon.max():.4f}]")
     
-    # Create comparison figure (toggle original model rows/MSE)
+    # Create reconstruction figure for inputs vs improved outputs
     # Use consistent vmin/vmax across all plots for fair comparison
     vmin_data = data_np.min()
     vmax_data = data_np.max()
     
     cols = min(10, data_np.shape[0])
-    if improved_only:
-        fig, axes = plt.subplots(3, cols, figsize=(15, 9))
-        for i in range(cols):
-            axes[0, i].imshow(data_np[i], cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
-            axes[0, i].set_title(f'Original {i+1}')
-            axes[0, i].axis('off')
-            imp_recon = improved_recon[i, 0].numpy()
-            axes[1, i].imshow(imp_recon, cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
-            axes[1, i].set_title('Improved Model')  # no per-sample MSE shown
-            axes[1, i].axis('off')
-            diff = np.abs(data_np[i] - imp_recon)
-            axes[2, i].imshow(diff, cmap='hot', origin='lower', aspect='auto')
-            axes[2, i].set_title('Error')
-            axes[2, i].axis('off')
-        
-        # Determine number of conv layers in improved model
-        n_conv_layers = 4 if extra_conv else 3
-        plt.suptitle(f'Autoencoder: Improved Only (latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers})')
-        plt.tight_layout()
-        plt.savefig('autoencoder_improved_only.png', dpi=200, bbox_inches='tight')
-        plt.show()
-    else:
-        fig, axes = plt.subplots(4, cols, figsize=(15, 12))
-        for i in range(cols):
-            axes[0, i].imshow(data_np[i], cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
-            axes[0, i].set_title(f'Original {i+1}')
-            axes[0, i].axis('off')
-            orig_recon = original_recon[i, 0].numpy()
-            axes[1, i].imshow(orig_recon, cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
-            mse_orig = np.mean((data_np[i] - orig_recon)**2)
-            axes[1, i].set_title(f'Original Model\nMSE: {mse_orig:.3f}')
-            axes[1, i].axis('off')
-            imp_recon = improved_recon[i, 0].numpy()
-            axes[2, i].imshow(imp_recon, cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
-            mse_imp = np.mean((data_np[i] - imp_recon)**2)
-            axes[2, i].set_title(f'Improved Model\nMSE: {mse_imp:.3f}')
-            axes[2, i].axis('off')
-            diff = np.abs(data_np[i] - orig_recon)
-            axes[3, i].imshow(diff, cmap='hot', origin='lower', aspect='auto')
-            axes[3, i].set_title('Error (Original)')
-            axes[3, i].axis('off')
-        
-        # Determine number of conv layers in improved model
-        n_conv_layers = 4 if extra_conv else 3
-        plt.suptitle(f'Autoencoder Comparison: Original vs Improved (latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers})\nTop: Originals, 2nd: Original Model, 3rd: Improved Model, Bottom: Error')
-        plt.tight_layout()
-        plt.savefig('autoencoder_comparison.png', dpi=200, bbox_inches='tight')
-        plt.show()
+    fig, axes = plt.subplots(3, cols, figsize=(15, 9))
+    for i in range(cols):
+        axes[0, i].imshow(data_np[i], cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
+        axes[0, i].set_title(f'Input {i+1}')
+        axes[0, i].axis('off')
+        imp_recon = improved_recon[i, 0].numpy()
+        axes[1, i].imshow(imp_recon, cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
+        axes[1, i].set_title('Improved Reconstruction')
+        axes[1, i].axis('off')
+        diff = np.abs(data_np[i] - imp_recon)
+        axes[2, i].imshow(diff, cmap='hot', origin='lower', aspect='auto')
+        axes[2, i].set_title('Error')
+        axes[2, i].axis('off')
     
-    # Loss comparison plots (toggle original and MSE bar chart)
-    if improved_only:
-        n_conv_layers = 4 if extra_conv else 3
-        plt.figure(figsize=(6, 4))
-        plt.plot(improved_losses, label='Improved')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title(f'Training Loss (Improved only) latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers}')
-        plt.yscale('log')
-        plt.tight_layout()
-        plt.savefig('training_improved_only.png', dpi=150)
-        plt.show()
-        # Latent t-SNE visualization for improved-only mode with simple clustering
-        try:
-            # Use full dataset embeddings if available, otherwise visualization subset
-            if 'improved_latent_full' in locals() and improved_latent_full is not None:
-                imp_z = improved_latent_full.detach().cpu().numpy()
-                labels_for_tsne = labels_full
-                print(f"\nComputing t-SNE on {len(imp_z)} samples from full dataset...")
+    # Determine number of conv layers in improved model
+    n_conv_layers = 4 if extra_conv else 3
+    plt.suptitle(f'Autoencoder Reconstructions (latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers})')
+    plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
+    plt.tight_layout()
+    recon_fig_path = os.path.join(output_dir, 'autoencoder_improved.png')
+    plt.savefig(recon_fig_path, dpi=200, bbox_inches='tight')
+    plt.show()
+    
+    # Loss curve and latent visualization
+    n_conv_layers = 4 if extra_conv else 3
+    plt.figure(figsize=(6, 4))
+    plt.plot(improved_losses, label='Improved')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'Training Loss latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers}')
+    plt.yscale('log')
+    plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
+    plt.tight_layout()
+    training_fig_path = os.path.join(output_dir, 'training_improved.png')
+    plt.savefig(training_fig_path, dpi=150)
+    plt.show()
+    # Latent t-SNE visualization with optional clustering
+    try:
+        # Use full dataset embeddings if available, otherwise visualization subset
+        if 'improved_latent_full' in locals() and improved_latent_full is not None:
+            imp_z = improved_latent_full.detach().cpu().numpy()
+            labels_for_tsne = labels_full
+            print(f"\nComputing t-SNE on {len(imp_z)} samples from full dataset...")
+        else:
+            imp_z = improved_latent.detach().cpu().numpy()
+            labels_for_tsne = labels
+            print(f"\nComputing t-SNE on {len(imp_z)} samples from visualization subset...")
+        
+        n = imp_z.shape[0]
+        if n >= 2:
+            # Choose a safe perplexity (< number of samples)
+            if tsne_perplexity is None:
+                perplexity = float(max(2.0, min(30.0, (n - 1) / 3.0)))
             else:
-                imp_z = improved_latent.detach().cpu().numpy()
-                labels_for_tsne = labels
-                print(f"\nComputing t-SNE on {len(imp_z)} samples from visualization subset...")
-            
-            n = imp_z.shape[0]
-            if n >= 2:
-                # Choose a safe perplexity (< number of samples)
-                if tsne_perplexity is None:
-                    perplexity = float(max(2.0, min(30.0, (n - 1) / 3.0)))
-                else:
-                    perplexity = float(tsne_perplexity)
-                # Ensure it's strictly less than n
-                if perplexity >= n:
-                    print(f"Warning: tsne_perplexity={perplexity} >= n={n}; reducing to {n-1:.1f}")
-                    perplexity = max(2.0, n - 1.0)
-                if TSNE is not None and n > 2:
-                    try:
-                        emb = TSNE(n_components=2,
-                                   random_state=int(seed) if seed is not None else 0,
-                                   init='pca',
-                                   perplexity=perplexity,
-                                   learning_rate='auto').fit_transform(imp_z)
-                    except Exception:
-                        # Fallback to PCA if TSNE fails
-                        Xc = imp_z - imp_z.mean(0, keepdims=True)
-                        U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
-                        emb = Xc @ Vt[:2].T
-                else:
-                    # PCA fallback or degenerate small-N case
+                perplexity = float(tsne_perplexity)
+            # Ensure it's strictly less than n
+            if perplexity >= n:
+                print(f"Warning: tsne_perplexity={perplexity} >= n={n}; reducing to {n-1:.1f}")
+                perplexity = max(2.0, n - 1.0)
+            if TSNE is not None and n > 2:
+                try:
+                    emb = TSNE(n_components=2,
+                               random_state=int(seed) if seed is not None else 0,
+                               init='pca',
+                               perplexity=perplexity,
+                               learning_rate='auto').fit_transform(imp_z)
+                except Exception:
+                    # Fallback to PCA if TSNE fails
                     Xc = imp_z - imp_z.mean(0, keepdims=True)
                     U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
                     emb = Xc @ Vt[:2].T
-
-                # Create visualization: if we have labels, show both true labels and clusters
-                if has_labels and labels_for_tsne is not None:
-                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-                    
-                    # Plot 1: Colored by true dataset source
-                    colors_true = ['#1f77b4' if l == 0 else '#ff7f0e' for l in labels_for_tsne]
-                    ax1.scatter(emb[:, 0], emb[:, 1], c=colors_true, alpha=0.7, s=30)
-                    ax1.set_title(f'Latent Space by Dataset Source (n={n})')
-                    ax1.set_xlabel('t-SNE 1')
-                    ax1.set_ylabel('t-SNE 2')
-                    
-                    # Custom legend
-                    from matplotlib.patches import Patch
-                    legend_elements = [
-                        Patch(facecolor='#1f77b4', label=f'Airguns (n={np.sum(labels_for_tsne==0)})'),
-                        Patch(facecolor='#ff7f0e', label=f'Whale Calls (n={np.sum(labels_for_tsne==1)})')
-                    ]
-                    ax1.legend(handles=legend_elements, loc='best')
-                    
-                    # Plot 2: KMeans clustering
-                    if KMeans is not None and n >= k_clusters:
-                        k = int(k_clusters) if isinstance(k_clusters, int) else 2
-                        if k < 2:
-                            print(f"Warning: k-clusters {k} < 2; using k=2")
-                            k = 2
-                        kmeans = KMeans(n_clusters=k, n_init='auto', random_state=int(seed) if seed is not None else 0)
-                        clusters = kmeans.fit_predict(imp_z)
-                        
-                        cluster_colors = plt.cm.tab10(np.linspace(0, 1, k))
-                        colors_cluster = [cluster_colors[c] for c in clusters]
-                        
-                        ax2.scatter(emb[:, 0], emb[:, 1], c=colors_cluster, alpha=0.7, s=30)
-                        ax2.set_title(f'Latent Space by KMeans (k={k})')
-                        ax2.set_xlabel('t-SNE 1')
-                        ax2.set_ylabel('t-SNE 2')
-                        
-                        legend_elements_cluster = [
-                            Patch(facecolor=cluster_colors[i], label=f'Cluster {i} (n={np.sum(clusters==i)})')
-                            for i in range(k)
-                        ]
-                        ax2.legend(handles=legend_elements_cluster, loc='best')
-                    else:
-                        ax2.text(0.5, 0.5, 'Clustering unavailable', ha='center', va='center', transform=ax2.transAxes)
-                    
-                    plt.suptitle(f'Improved latent t-SNE\nlatent_dim={latent_dim}, channels={channels}, perplexity={perplexity:.1f}')
-                    plt.tight_layout()
-                    plt.savefig('improved_latent_tsne.png', dpi=160)
-                    plt.show()
-                    
-                    # Compute separation metric
-                    if len(np.unique(labels_for_tsne)) == 2:
-                        airgun_emb = emb[labels_for_tsne == 0]
-                        whale_emb = emb[labels_for_tsne == 1]
-                        if len(airgun_emb) > 0 and len(whale_emb) > 0:
-                            airgun_center = airgun_emb.mean(0)
-                            whale_center = whale_emb.mean(0)
-                            between_dist = np.linalg.norm(airgun_center - whale_center)
-                            within_airgun = np.mean([np.linalg.norm(x - airgun_center) for x in airgun_emb])
-                            within_whale = np.mean([np.linalg.norm(x - whale_center) for x in whale_emb])
-                            separation_ratio = between_dist / (within_airgun + within_whale + 1e-10)
-                            print(f"  Separation ratio: {separation_ratio:.3f} (higher = better separation)")
-                else:
-                    # Original single-plot clustering visualization
-                    # Try KMeans clustering into k groups; fallback to sign/median split
-                    try:
-                        if KMeans is None:
-                            raise RuntimeError("KMeans not available")
-                        k = int(k_clusters) if isinstance(k_clusters, int) else 2
-                        if k < 2:
-                            print(f"Warning: k-clusters {k} < 2; using k=2")
-                            k = 2
-                        kmeans = KMeans(n_clusters=k, n_init='auto', random_state=int(seed) if seed is not None else 0)
-                        clusters = kmeans.fit_predict(imp_z)
-                    except Exception:
-                        # Fallback heuristic: split by sign along first embedding axis
-                        clusters = (emb[:, 0] > np.median(emb[:, 0])).astype(int)
-
-                    colors = np.where(clusters == 0, '#1f77b4', '#ff7f0e')
-                    plt.figure(figsize=(6, 5))
-                    plt.scatter(emb[:, 0], emb[:, 1], c=colors, alpha=0.85, s=28)
-                    plt.title(f'Improved latent t-SNE (k={k_clusters})\nlatent_dim={latent_dim}, channels={channels}, perplexity={perplexity:.1f}')
-                    plt.xlabel('t-SNE 1')
-                    plt.ylabel('t-SNE 2')
-                    plt.tight_layout()
-                    plt.savefig('improved_latent_tsne.png', dpi=160)
-                    plt.show()
-        except Exception as e:
-            print(f"Warning: improved-only latent t-SNE plotting skipped due to error: {e}")
-    else:
-        n_conv_layers = 4 if extra_conv else 3
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
-        plt.plot(original_losses, label='Original (with sigmoid)')
-        plt.plot(improved_losses, label='Improved (without sigmoid)')
-        plt.xlabel('Epoch')
-        plt.ylabel('MSE Loss')
-        plt.title(f'Training Loss Comparison (latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers})')
-        plt.legend()
-        plt.yscale('log')
-        
-        plt.subplot(1, 2, 2)
-        # Latent t-SNE visualization instead of MSE bar
-        orig_z = original_latent.detach().cpu().numpy()
-        imp_z = improved_latent.detach().cpu().numpy()
-        X = np.vstack([orig_z, imp_z])
-        labels = np.array([0] * orig_z.shape[0] + [1] * imp_z.shape[0])
-        # Choose a safe perplexity (< number of samples)
-        n = X.shape[0]
-        if tsne_perplexity is None:
-            perplexity = float(max(2.0, min(30.0, (n - 1) / 3.0)))
-        else:
-            perplexity = float(tsne_perplexity)
-        if perplexity >= n:
-            print(f"Warning: tsne_perplexity={perplexity} >= n={n}; reducing to {n-1:.1f}")
-            perplexity = max(2.0, n - 1.0)
-        if TSNE is not None and n > 2:
-            try:
-                emb = TSNE(n_components=2, random_state=int(seed) if seed is not None else 0,
-                           init='pca', perplexity=perplexity, learning_rate='auto').fit_transform(X)
-            except Exception:
-                # Fallback to PCA if TSNE fails
-                Xc = X - X.mean(0, keepdims=True)
+            else:
+                # PCA fallback or degenerate small-N case
+                Xc = imp_z - imp_z.mean(0, keepdims=True)
                 U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
                 emb = Xc @ Vt[:2].T
-        else:
-            # PCA fallback or degenerate small-N case
-            Xc = X - X.mean(0, keepdims=True)
-            U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
-            emb = Xc @ Vt[:2].T
-        # Plot scatter
-        colors = np.where(labels == 0, '#d62728', '#2ca02c')  # red for original, green for improved
-        plt.scatter(emb[labels == 0, 0], emb[labels == 0, 1], c='#d62728', label='Original latent', alpha=0.8, s=24)
-        plt.scatter(emb[labels == 1, 0], emb[labels == 1, 1], c='#2ca02c', label='Improved latent', alpha=0.8, s=24)
-        plt.title(f'Latent t-SNE (latent_dim={latent_dim}, channels={channels})')
-        plt.xlabel('t-SNE 1')
-        plt.ylabel('t-SNE 2')
-        plt.legend(loc='best', fontsize=8)
-        
-        plt.tight_layout()
-        plt.savefig('training_comparison.png', dpi=150)
-        plt.show()
+
+            # Create visualization: if we have multiple labels, show both true labels and clusters
+            if labels_for_tsne is not None and len(np.unique(labels_for_tsne)) > 1:
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                
+                # Plot 1: Colored by true dataset source
+                colors_true = ['#1f77b4' if l == 0 else '#ff7f0e' for l in labels_for_tsne]
+                ax1.scatter(emb[:, 0], emb[:, 1], c=colors_true, alpha=0.7, s=30)
+                ax1.set_title(f'Latent Space by Dataset Source (n={n})')
+                ax1.set_xlabel('t-SNE 1')
+                ax1.set_ylabel('t-SNE 2')
+                
+                # Custom legend
+                from matplotlib.patches import Patch
+                legend_elements = [
+                    Patch(facecolor='#1f77b4', label=f'Airguns (n={np.sum(labels_for_tsne==0)})'),
+                    Patch(facecolor='#ff7f0e', label=f'Whale Calls (n={np.sum(labels_for_tsne==1)})')
+                ]
+                ax1.legend(handles=legend_elements, loc='best')
+                
+                # Plot 2: KMeans clustering
+                if KMeans is not None and n >= k_clusters:
+                    k = int(k_clusters) if isinstance(k_clusters, int) else 2
+                    if k < 2:
+                        print(f"Warning: k-clusters {k} < 2; using k=2")
+                        k = 2
+                    kmeans = KMeans(n_clusters=k, n_init='auto', random_state=int(seed) if seed is not None else 0)
+                    clusters = kmeans.fit_predict(imp_z)
+                    
+                    cluster_colors = plt.cm.tab10(np.linspace(0, 1, k))
+                    colors_cluster = [cluster_colors[c] for c in clusters]
+                    
+                    ax2.scatter(emb[:, 0], emb[:, 1], c=colors_cluster, alpha=0.7, s=30)
+                    ax2.set_title(f'Latent Space by KMeans (k={k})')
+                    ax2.set_xlabel('t-SNE 1')
+                    ax2.set_ylabel('t-SNE 2')
+                    
+                    legend_elements_cluster = [
+                        Patch(facecolor=cluster_colors[i], label=f'Cluster {i} (n={np.sum(clusters==i)})')
+                        for i in range(k)
+                    ]
+                    ax2.legend(handles=legend_elements_cluster, loc='best')
+                else:
+                    ax2.text(0.5, 0.5, 'Clustering unavailable', ha='center', va='center', transform=ax2.transAxes)
+                
+                plt.suptitle(f'Improved latent t-SNE\nlatent_dim={latent_dim}, channels={channels}, perplexity={perplexity:.1f}')
+                plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
+                plt.tight_layout()
+                tsne_path = os.path.join(output_dir, 'improved_latent_tsne.png')
+                plt.savefig(tsne_path, dpi=160)
+                plt.show()
+                
+                # Compute separation metric for binary label sets
+                if len(np.unique(labels_for_tsne)) == 2:
+                    airgun_emb = emb[labels_for_tsne == 0]
+                    whale_emb = emb[labels_for_tsne == 1]
+                    if len(airgun_emb) > 0 and len(whale_emb) > 0:
+                        airgun_center = airgun_emb.mean(0)
+                        whale_center = whale_emb.mean(0)
+                        between_dist = np.linalg.norm(airgun_center - whale_center)
+                        within_airgun = np.mean([np.linalg.norm(x - airgun_center) for x in airgun_emb])
+                        within_whale = np.mean([np.linalg.norm(x - whale_center) for x in whale_emb])
+                        separation_ratio = between_dist / (within_airgun + within_whale + 1e-10)
+                        print(f"  Separation ratio: {separation_ratio:.3f} (higher = better separation)")
+            else:
+                # Single-plot clustering visualization
+                try:
+                    if KMeans is None:
+                        raise RuntimeError("KMeans not available")
+                    k = int(k_clusters) if isinstance(k_clusters, int) else 2
+                    if k < 2:
+                        print(f"Warning: k-clusters {k} < 2; using k=2")
+                        k = 2
+                    kmeans = KMeans(n_clusters=k, n_init='auto', random_state=int(seed) if seed is not None else 0)
+                    clusters = kmeans.fit_predict(imp_z)
+                except Exception:
+                    # Fallback heuristic: split by sign along first embedding axis
+                    clusters = (emb[:, 0] > np.median(emb[:, 0])).astype(int)
+
+                colors = np.where(clusters == 0, '#1f77b4', '#ff7f0e')
+                plt.figure(figsize=(6, 5))
+                plt.scatter(emb[:, 0], emb[:, 1], c=colors, alpha=0.85, s=28)
+                plt.title(f'Improved latent t-SNE (k={k_clusters})\nlatent_dim={latent_dim}, channels={channels}, perplexity={perplexity:.1f}')
+                plt.xlabel('t-SNE 1')
+                plt.ylabel('t-SNE 2')
+                plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
+                plt.tight_layout()
+                tsne_path = os.path.join(output_dir, 'improved_latent_tsne.png')
+                plt.savefig(tsne_path, dpi=160)
+                plt.show()
+    except Exception as e:
+        print(f"Warning: latent t-SNE plotting skipped due to error: {e}")
     
+    # Save JPEG panels for randomly selected samples
+    try:
+        panel_samples = select_samples_for_outputs(dataset, data_tensor, output_samples, seed)
+        panels_written = save_reconstruction_panels(improved_model, panel_samples, output_dir, (nrow, ncol),
+                                                     dataset_label=dataset_label)
+        print(f"Saved {panels_written} JPEG panel(s) covering {panel_samples.shape[0]} samples to {output_dir}")
+    except Exception as e:
+        print(f"Warning: unable to create JPEG panels: {e}")
+
     # Save sample data for further testing
     # Use the in-memory visualization tensor if available (data_tensor -> data_np), otherwise fall back
     try:
@@ -1040,19 +1044,13 @@ def compare_autoencoder_performance(data_dir: str | list[str], n_samples: int = 
         else:
             spectrograms = None
 
-    if improved_only:
-        sample_data = {
-            'spectrograms': spectrograms,
-            'improved_recon': improved_recon.squeeze().numpy()
-        }
-    else:
-        sample_data = {
-            'spectrograms': spectrograms,
-            'original_recon': original_recon.squeeze().numpy(),
-            'improved_recon': improved_recon.squeeze().numpy()
-        }
-    savemat('autoencoder_comparison_data.mat', sample_data)
-    print("Saved comparison data to autoencoder_comparison_data.mat")
+    sample_data = {
+        'spectrograms': spectrograms,
+        'improved_recon': improved_recon.squeeze().numpy()
+    }
+    mat_path = os.path.join(output_dir, 'autoencoder_reconstruction_data.mat')
+    savemat(mat_path, sample_data)
+    print(f"Saved reconstruction data to {mat_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare AEs on real SNR_gram data")
@@ -1064,10 +1062,8 @@ if __name__ == "__main__":
     parser.add_argument("--n-samples", type=int, default=15, help="Number of samples for reconstruction visualization")
     parser.add_argument("--tsne-samples", type=int, default=None, 
                        help="Number of samples for t-SNE plot (default: 100 for multi-dir, n-samples otherwise)")
-    parser.add_argument("--no-normalize", action='store_true', help="Disable per-image min-max normalization")
     parser.add_argument("--latent-dim", type=int, default=LATENT_DIM_DEFAULT, help="Latent space size for both models")
     parser.add_argument("--channels", type=int, default=CHANNELS_DEFAULT, help="Base number of channels for conv blocks")
-    parser.add_argument("--improved-only", action='store_true', help="Skip original model training and plots; hide MSE comparison")
     parser.add_argument("--epochs", type=int, default=EPOCHS_DEFAULT, help="Training epochs for each model (global default EPOCHS_DEFAULT)")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for Adam optimizer")
     parser.add_argument("--progress-interval", type=int, default=0, help="If >0, save interim recon panels every N epochs")
@@ -1081,6 +1077,10 @@ if __name__ == "__main__":
                        help="Disable extra convolutional layer (use 3 layers instead of 4)")
     parser.add_argument("--load-all", action='store_true', help="Load ALL files from directory(ies) instead of sampling (WARNING: high memory usage!)")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size for DataLoader training (default: 32, only used without --load-all)")
+    parser.add_argument("--output-samples", type=int, default=NUMBER_OUTPUT_IMAGE_SAMPLES,
+                       help="Number of random spectrograms to render into JPEG panels (default: 200)")
+    parser.add_argument("--version-tag", type=str, default=DEFAULT_VERSION_TAG,
+                       help="Version identifier used in the Autoencoder_vXX_Date*.dir output folder name")
     args = parser.parse_args()
     
     # Use multiple directories if specified, otherwise single directory
@@ -1088,12 +1088,11 @@ if __name__ == "__main__":
     
     compare_autoencoder_performance(data_input,
                                     n_samples=args.n_samples,
-                                    normalize=not args.no_normalize,
+                                    normalize=True,
                                     latent_dim=args.latent_dim,
                                     channels=args.channels,
                                     seed=args.seed,
                                     show_files=args.show_files,
-                                    improved_only=args.improved_only,
                                     epochs=args.epochs,
                                     lr=args.lr,
                                     progress_interval=(args.progress_interval if args.progress_interval > 0 else None),
@@ -1102,4 +1101,6 @@ if __name__ == "__main__":
                                     tsne_samples=args.tsne_samples,
                                     extra_conv=args.extra_conv,
                                     load_all=args.load_all,
-                                    batch_size=args.batch_size)
+                                    batch_size=args.batch_size,
+                                    output_samples=args.output_samples,
+                                    version_tag=args.version_tag)
