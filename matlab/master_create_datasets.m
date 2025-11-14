@@ -37,14 +37,14 @@ else
     GSI_file_dir='/Volumes/Shared/Data/';
     code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software';
     WAV_file_dir='/Volumes/Bowhead4/';
-    Manual_record_files_dir='../Shell_Manual_Results';
+    Manual_record_files_dir='../../Shell_Manual_Results';
 
 end
 cd(code_dir)
 
 
 data_file_type='GSI'; %'GSI' or 'WAV' for raw audio data source
-output_dir='../Spectrogram_Image_Database.dir';  %%Where to save the database
+output_dir='../../Spectrogram_Image_Database.dir';  %%Where to save the database
 eval(sprintf('!mkdir %s',output_dir));
 
 %%%%%Fundamental parameters to change

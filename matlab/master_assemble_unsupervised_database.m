@@ -9,7 +9,7 @@
 close all
 clear
 
-database_folder='../Spectrogram_Image_Database.dir';
+database_folder='../../Spectrogram_Image_Database.dir';
 data=load([database_folder '/Database_index.mat']);
 eval(sprintf('!mkdir %s/Unsupervised_database.dir',database_folder));
 eval(sprintf('!rm %s/Unsupervised_database.dir/*.mat',database_folder));
