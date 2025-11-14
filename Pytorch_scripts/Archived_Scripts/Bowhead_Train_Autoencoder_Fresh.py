@@ -28,28 +28,38 @@ from torchvision.utils import make_grid
 from torch.nn import functional as F
 import time
 
+
 # ---------------------------
 # Global experiment settings
 # ---------------------------
 MODEL_CHANNELS = [32, 64, 128]   # Edit to try wider/narrower models, e.g., [16,32,64] or [64,128,256]
-MODEL_LATENT_DIM = 64            # Edit to change latent bottleneck size
-EPOCHS = 5                      # Edit to set default training epochs
+MODEL_LATENT_DIM = 128            # Edit to change latent bottleneck size
+EPOCHS = 3                      # Edit to set default training epochs
 PANEL_SEED = 1337                # Controls the fixed 15-sample selection for the comparison panel
 USE_FILE_PICKER = False          # If True, select .mat files via a dialog instead of scanning a folder
 USE_REFINEMENT_HEAD = True       # If True, add a residual refinement head after decoder
-USE_UNET_SKIPS = True           # If True, add U-Net style skip connections (encoder -> decoder)
-USE_UPSAMPLE_CONV = True        # If True, use Upsample+Conv instead of ConvTranspose2d
+USE_UNET_SKIPS = False           # If True, add U-Net style skip connections (encoder -> decoder)
+USE_UPSAMPLE_CONV = False        # If True, use Upsample+Conv instead of ConvTranspose2d
 USE_SE_BLOCKS = False            # If True, add Squeeze-and-Excitation blocks in encoder
 
 # Resolve repo root regardless of current working directory
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Auto-visualization after training completes
+AUTO_VISUALIZE_AFTER_TRAIN = True
+VIS_NO_GRAPHVIZ = False          # Set True to skip the schematic
+VIS_NO_TORCHVIZ = False          # Set True to skip the detailed compute graph
+VIS_NO_SUMMARY = False           # Set True to skip the torchinfo summary
 # CLI arguments
-# Default to the Airguns dataset provided by the user
-default_data_dir = "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_With_Airguns.dir"
+# Defaults to the BCB_Whale_Datasets root and the Airguns dataset
+DEFAULT_ROOT_DIR = "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets"
+DEFAULT_DATASET_NAME = "Unsupervised_database_With_Airguns.dir"
+default_data_dir = os.path.join(DEFAULT_ROOT_DIR, DEFAULT_DATASET_NAME)
 default_logdir = os.path.join(REPO_ROOT, "runs")
 parser = argparse.ArgumentParser(description="Train improved bowhead spectrogram autoencoder")
-parser.add_argument("--data-dir", default=default_data_dir, help="Path to dataset root (folder containing .mat files)")
+parser.add_argument("--data-dir", default=default_data_dir, help="Full path to dataset root (folder containing .mat files)")
+parser.add_argument("--root-dir", default=DEFAULT_ROOT_DIR, help="Root directory containing dataset folders")
+parser.add_argument("--dataset", default=None, help="Dataset folder name under --root-dir to use instead of --data-dir (e.g., Unsupervised_database_No_Airguns.dir)")
 parser.add_argument("--logdir", default=default_logdir, help="TensorBoard log directory")
 parser.add_argument("--epochs", type=int, default=EPOCHS, help="Number of training epochs (override default EPOCHS)")
 parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
@@ -59,8 +69,11 @@ parser.add_argument("--normalize", action='store_true', help="Normalize input da
 parser.add_argument("--l1-loss", action='store_true', help="Use L1 loss instead of MSE")
 args = parser.parse_args()
 
+# Resolve the effective dataset directory
+data_dir = os.path.join(args.root_dir, args.dataset) if args.dataset else args.data_dir
+
 # Dataset directories
-savedir = [args.data_dir]
+savedir = [data_dir]
 batch_size = args.batch_size
 learning_rate = args.lr
 validation_split = 0.2
@@ -93,8 +106,8 @@ class ImprovedAutoencoder(nn.Module):
     use_se_blocks: add SE blocks to encoder conv stages.
     """
     
-    def __init__(self, nrow, ncol, latent_dim=64, channels=(32, 64, 128), use_refine=True,
-                 use_unet_skips=False, use_upsample_conv=False, use_se_blocks=False):
+    def __init__(self, nrow, ncol, latent_dim, channels, use_refine,
+                 use_unet_skips, use_upsample_conv, use_se_blocks):
         super(ImprovedAutoencoder, self).__init__()
         
         self.nrow, self.ncol = nrow, ncol
@@ -253,6 +266,45 @@ class ImprovedAutoencoder(nn.Module):
         
         return output, latent
 
+
+def build_model(
+    nrow: int,
+    ncol: int,
+    latent_dim: int | None = None,
+    channels: tuple[int, int, int] | None = None,
+    refine: bool | None = None,
+    unet: bool | None = None,
+    upsample: bool | None = None,
+    se: bool | None = None,
+):
+    """Factory for ImprovedAutoencoder using globals by default.
+
+    Any None parameter falls back to the corresponding module-level global.
+    """
+    if latent_dim is None:
+        latent_dim = MODEL_LATENT_DIM
+    if channels is None:
+        channels = tuple(MODEL_CHANNELS)
+    if refine is None:
+        refine = USE_REFINEMENT_HEAD
+    if unet is None:
+        unet = USE_UNET_SKIPS
+    if upsample is None:
+        upsample = USE_UPSAMPLE_CONV
+    if se is None:
+        se = USE_SE_BLOCKS
+
+    return ImprovedAutoencoder(
+        nrow,
+        ncol,
+        latent_dim=latent_dim,
+        channels=channels,
+        use_refine=refine,
+        use_unet_skips=unet,
+        use_upsample_conv=upsample,
+        use_se_blocks=se,
+    )
+
 class SpectrogramDataset(Dataset):
     """Dataset class for loading .mat spectrogram files."""
     
@@ -380,7 +432,7 @@ for folder in savedir:
     config_text = f"""
     Architecture: Improved Autoencoder
     Input size: {nrow} x {ncol}
-    Latent dimension: {args.latent_dim}
+    Latent dimension: {MODEL_LATENT_DIM}
     Channels: {MODEL_CHANNELS}
     Batch size: {batch_size}
     Learning rate: {learning_rate}
@@ -395,11 +447,11 @@ for folder in savedir:
     writer.add_text('config', config_text, 0)
 
     # Also log a Markdown table for easy viewing in TensorBoard
-    config_table = """
+    config_table = f"""
     | Key | Value |
     | --- | ----- |
     | Input size | {nrow} x {ncol} |
-    | Latent dim | {args.latent_dim} |
+    | Latent dim | {MODEL_LATENT_DIM} |
     | Channels | {MODEL_CHANNELS} |
     | Batch size | {batch_size} |
     | Learning rate | {learning_rate} |
@@ -421,7 +473,7 @@ for folder in savedir:
     run_dir = os.path.join(LOG_ROOT, run_name)
     config_json = {
         'input_size': [int(nrow), int(ncol)],
-        'latent_dim': int(args.latent_dim),
+        'latent_dim': int(MODEL_LATENT_DIM),
         'channels': list(map(int, MODEL_CHANNELS)),
         'batch_size': int(batch_size),
         'learning_rate': float(learning_rate),
@@ -469,19 +521,22 @@ for folder in savedir:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    autoencoder = ImprovedAutoencoder(
-        nrow,
-        ncol,
-        latent_dim=args.latent_dim,
-        channels=tuple(MODEL_CHANNELS),
-        use_refine=USE_REFINEMENT_HEAD,
-        use_unet_skips=USE_UNET_SKIPS,
-        use_upsample_conv=USE_UPSAMPLE_CONV,
-        use_se_blocks=USE_SE_BLOCKS,
-    ).to(device)
+    # Build model using globals (centralized via factory)
+    autoencoder = build_model(nrow, ncol).to(device)
     
     # Loss function
     criterion = nn.L1Loss() if args.l1_loss else nn.MSELoss()
+    
+    # Optional: log a model graph to make TensorBoard's Graphs tab interactive
+    try:
+        autoencoder.eval()
+        with torch.no_grad():
+            dummy_input = torch.randn(1, 1, nrow, ncol, device=device)
+            writer.add_graph(autoencoder, dummy_input)
+            writer.flush()
+        print("[info] Computation graph logged to TensorBoard (Graphs tab)")
+    except Exception as e:
+        print(f"[info] Skipping TensorBoard add_graph (Graphs): {e}")
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
     
@@ -667,7 +722,7 @@ for folder in savedir:
 
             if imgs:
                 batch = torch.stack(imgs, dim=0).to(device)  # [N,1,H,W]
-                recon, _ = autoencoder(batch.float())        # [N,1,H,W]
+                recon, lat = autoencoder(batch.float())      # [N,1,H,W], [N,D]
                 if recon.shape[-2:] != batch.shape[-2:]:
                     recon = torch.nn.functional.interpolate(recon, size=batch.shape[-2:], mode='bilinear', align_corners=False)
 
@@ -728,6 +783,26 @@ for folder in savedir:
                     print(f"Saved list of panel files: {panel_list_name}")
                 except Exception as e:
                     print(f"Failed to save panel file list: {e}")
+
+                # Log an embedding to make TensorBoard's Projector tab interactive
+                try:
+                    # Normalize thumbnails to [0,1] per-image for better display
+                    lbl = batch.detach().cpu().float()
+                    mins = lbl.amin(dim=(2,3), keepdim=True)
+                    maxs = lbl.amax(dim=(2,3), keepdim=True)
+                    lbl = (lbl - mins) / (maxs - mins + 1e-8)
+                    # Add embedding with metadata (filenames) and label images (thumbnails)
+                    writer.add_embedding(
+                        lat.detach().cpu().float(),
+                        metadata=[os.path.basename(n) for n in names],
+                        label_img=lbl,
+                        global_step=args.epochs,
+                        tag='Projector/Latent'
+                    )
+                    writer.flush()
+                    print("[info] Latent embeddings logged to TensorBoard (Projector tab)")
+                except Exception as e:
+                    print(f"[info] Skipping TensorBoard embedding (Projector): {e}")
             else:
                 print("No images could be loaded for the random panel.")
     except Exception as e:
@@ -738,5 +813,48 @@ for folder in savedir:
     print(f"  Best: improved_{dataset_slug}_best_model.pth")
     print(f"  Final: {final_model_name}")
     print(f"  Plots: {plot_name}, {comparison_name}{', ' + panel_name if 'panel_name' in locals() else ''}")
+
+    # Optional: auto-generate architecture visuals for presentations
+    if AUTO_VISUALIZE_AFTER_TRAIN:
+        try:
+            import subprocess, sys, shutil, importlib.util
+            vis_script = os.path.join(REPO_ROOT, 'Pytorch_scripts', 'visualize_architecture.py')
+            cmd = [
+                sys.executable, vis_script,
+                '--height', str(nrow),
+                '--width', str(ncol),
+                '--channels', str(MODEL_CHANNELS[0]), str(MODEL_CHANNELS[1]), str(MODEL_CHANNELS[2]),
+                '--latent', str(MODEL_LATENT_DIM),
+            ]
+            if USE_REFINEMENT_HEAD:
+                cmd.append('--refine')
+            if USE_UNET_SKIPS:
+                cmd.append('--unet-skips')
+            if USE_UPSAMPLE_CONV:
+                cmd.append('--upsample-conv')
+            if USE_SE_BLOCKS:
+                cmd.append('--se-blocks')
+            # Auto-skip features if dependencies are unavailable
+            has_dot = shutil.which('dot') is not None
+            if not has_dot:
+                print("[info] Graphviz 'dot' not found on PATH. Skipping schematic (pass --no-graphviz).")
+            if VIS_NO_GRAPHVIZ or not has_dot:
+                cmd.append('--no-graphviz')
+
+            has_torchviz = importlib.util.find_spec('torchviz') is not None
+            if not has_torchviz:
+                print("[info] torchviz not installed. Skipping detailed compute graph (pass --no-torchviz).")
+            if VIS_NO_TORCHVIZ or not has_torchviz:
+                cmd.append('--no-torchviz')
+
+            has_torchinfo = importlib.util.find_spec('torchinfo') is not None
+            if not has_torchinfo:
+                print("[info] torchinfo not installed. Skipping model summary (pass --no-summary).")
+            if VIS_NO_SUMMARY or not has_torchinfo:
+                cmd.append('--no-summary')
+            print(f"Generating architecture visuals: {' '.join(cmd)}")
+            subprocess.run(cmd, check=False)
+        except Exception as e:
+            print(f"[info] Auto-visualization skipped due to error: {e}")
 
 print("All datasets processed!")

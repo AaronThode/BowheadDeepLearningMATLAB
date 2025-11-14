@@ -8,31 +8,82 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
+import torch.nn.functional as F
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
 import time
 
+# NOTE: Minimal edits policy
+# CHANGE tags mark small, targeted modifications added for stability or configurability.
+# The overall structure of the original script is preserved.
+
 # Resolve repo root regardless of current working directory
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# ---------------------------
+# Global model toggles
+# ---------------------------
+# You can edit these defaults and/or override via CLI flags
+MODEL_LATENT_DIM = 96          # Latent space size (was 64)
+MODEL_CHANNELS = 128           # Deepest encoder/decoder channels (was 128)
+ADD_EXTRA_CONV = False         # If True, add one more conv before last pooling
+
+# ---------------------------
+# Global training hyperparameters
+# ---------------------------
+# These control dataset batching, optimization, and the validation split ratio.
+#
+# BATCH_SIZE:
+# - Number of samples processed together before the model updates its weights.
+# - Larger batches improve throughput and provide smoother gradient estimates, but require more memory.
+# - If you run out of GPU/CPU RAM or see slowdowns, reduce this value; if utilization is low, try increasing it.
+# - Typical ranges: 16–256 depending on input size and hardware; 64 is a safe default for 2D spectrograms.
+BATCH_SIZE = 64
+#
+# LEARNING_RATE:
+# - Step size for the optimizer (Adam here). Higher values train faster but may become unstable; lower values are safer.
+# - If loss is not decreasing or oscillates wildly, lower this; if training is very slow and stable, try increasing it slightly.
+# - Typical ranges: 1e-3 to 1e-5; 1e-4 is a conservative starting point for autoencoders.
+LEARNING_RATE = 1e-5
+#
+# VALIDATION_SPLIT:
+# - Fraction of the dataset held out from training and used to report validation metrics each epoch.
+# - Ensures we detect overfitting and track generalization; raising it gives more accurate validation at the cost of fewer training samples.
+# - Typical ranges: 0.1–0.3; 0.2 (20%) is a common default.
+VALIDATION_SPLIT = 0.2
+
 # CLI arguments to make data/log locations and epochs configurable
-# Default to the Airguns dataset provided by the user
-default_data_dir = "/Users/oceaneboulais/Github/Unsupervised_database_With_Airguns.dir"
+# Defaults point to the BCB_Whale_Datasets root and the Airguns dataset
+DEFAULT_ROOT_DIR = "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets"
+DEFAULT_DATASET_NAME = "Unsupervised_database_With_Airguns.dir"  # CHANGE: default dataset updated per request
+default_data_dir = os.path.join(DEFAULT_ROOT_DIR, DEFAULT_DATASET_NAME)
 default_logdir = os.path.join(REPO_ROOT, "runs")
 parser = argparse.ArgumentParser(description="Train bowhead spectrogram autoencoder with TensorBoard logging")
-parser.add_argument("--data-dir", default=default_data_dir, help="Path to dataset root (folder containing .mat files or subfolders)")
+parser.add_argument("--data-dir", default=default_data_dir, help="Full path to dataset root (folder containing .mat files or subfolders)")
+parser.add_argument("--root-dir", default=DEFAULT_ROOT_DIR, help="Root directory that contains multiple dataset folders")
+parser.add_argument("--dataset", default=None, help="Dataset folder name under --root-dir to use instead of --data-dir (e.g., Unsupervised_database_No_Airguns.dir)")
 parser.add_argument("--logdir", default=default_logdir, help="TensorBoard log directory (will be created if missing)")
-parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
+parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
+parser.add_argument("--latent-dim", type=int, default=MODEL_LATENT_DIM, help="Latent bottleneck size")
+parser.add_argument("--channels", type=int, default=MODEL_CHANNELS, help="Deepest encoder/decoder channel width")
+parser.add_argument("--extra-conv", action='store_true', default=ADD_EXTRA_CONV, help="Add an extra Conv2d layer before the last pooling")
+parser.add_argument("--normalize", action='store_true', help="Min-max normalize each spectrogram to [0,1] before feeding model (recommended if dynamic range varies)")  # CHANGE: enable per-image normalization
+parser.add_argument("--debug-overfit", type=int, default=0, help="If >0, limit dataset to N samples and try to overfit (sanity check)")  # CHANGE: add overfit sanity mode
+parser.add_argument("--l1-loss", action='store_true', help="CHANGE: use L1 loss instead of MSE (often sharper reconstructions)")
 args = parser.parse_args()
 
-# Dataset directories list (keep structure compatible with existing loop)
-savedir = [args.data_dir]
+# Resolve the effective dataset directory
+data_dir = os.path.join(args.root_dir, args.dataset) if args.dataset else args.data_dir
 
-batch_size = 64
-learning_rate = 0.0001
-validation_split = 0.2
+# Dataset directories list (keep structure compatible with existing loop)
+savedir = [data_dir]
+
+# Use global training hyperparameters defined above
+batch_size = BATCH_SIZE
+learning_rate = LEARNING_RATE
+validation_split = VALIDATION_SPLIT
 
 # Process each dataset folder separately
 for folder in savedir:
@@ -55,14 +106,16 @@ for folder in savedir:
     image = loadmat(file_path)['SNR_gram']
     nrow, ncol = image.shape
 
-    # Define channel and latent dimensions and derived shapes for the autoencoder
-    n_channels = 128  # Increased from 16 for better capacity
-    latent_dim = 64   # Increased from 16 for better representation
+    # Define channel and latent dimensions and derived shapes for the autoencoder (from globals/CLI)
+    n_channels = int(args.channels)
+    latent_dim = int(args.latent_dim)
+    use_extra_conv = bool(args.extra_conv)
     nrow_reduced = int(nrow / 8)
     ncol_reduced = int(ncol / 8)
     nel_reduced = nrow_reduced * ncol_reduced * n_channels
     print("Images have dimensions of nrow,ncol =", nrow, ncol)
-    print("Reduced dimensions before encoding to latent space:", nrow_reduced, ncol_reduced, nel_reduced)
+    print(f"Model config -> channels: {n_channels}, latent_dim: {latent_dim}, extra_conv: {use_extra_conv}")
+    print("Reduced dims before latent:", nrow_reduced, ncol_reduced, nel_reduced)
 
     # Setup TensorBoard writer for this dataset
     run_name = f"{os.path.basename(folder.rstrip('/'))}_" + time.strftime("%Y%m%d-%H%M%S")
@@ -109,6 +162,16 @@ for folder in savedir:
         print("No valid files remain after filtering; skipping this dataset")
         continue
 
+    # CHANGE: small helper to optionally normalize each image
+    def _normalize_image(im: np.ndarray) -> np.ndarray:
+        if not args.normalize:
+            return im
+        im_min = im.min()
+        im_max = im.max()
+        if im_max - im_min < 1e-8:
+            return np.zeros_like(im)
+        return (im - im_min) / (im_max - im_min)
+
     class CustomDatasetFull(Dataset):
         def __init__(self, folder_paths, transform=None, shuffle=False):
             self.file_list = []
@@ -125,6 +188,7 @@ for folder in savedir:
         def __getitem__(self, idx):
             file_path = self.file_list[idx]
             image = loadmat(file_path)['SNR_gram']
+            image = _normalize_image(image)  # CHANGE: apply optional per-image normalization
             my_debug = False
             if my_debug:
                 print(file_path)
@@ -167,6 +231,7 @@ for folder in savedir:
                 image = mat.get('SNR_gram', None)
                 if image is None or not isinstance(image, np.ndarray) or image.ndim != 2:
                     raise ValueError("SNR_gram missing or invalid")
+                image = _normalize_image(image)  # CHANGE: apply optional per-image normalization
             except Exception as e:
                 print(f"Warning: failed to load {file_path}: {e}; substituting zeros of shape ({nrow},{ncol})")
                 image = np.zeros((nrow, ncol), dtype=np.float32)
@@ -193,6 +258,10 @@ for folder in savedir:
                 plt.pause(5)
                 plt.close('all')
             return image
+    # CHANGE: Optional dataset limit for overfit-debug sanity check
+    if args.debug_overfit and len(valid_files) > args.debug_overfit:
+        valid_files = valid_files[:args.debug_overfit]
+        print(f"Debug-overfit mode: limiting to {len(valid_files)} files")
     dataset = CustomDatasetFull(valid_files, transform=custom_transform, shuffle=False)
     print(dataset[0].size())
     image_dims = dataset[0].size()[1:]
@@ -208,12 +277,40 @@ for folder in savedir:
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=_workers, pin_memory=_pin_mem)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=_workers, pin_memory=_pin_mem)
 
+    # CHANGE: ensure decoder output matches input spatial size (crop/pad)
+    def match_shape(recon: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Ensure recon spatial dims match target by center-cropping or padding as needed."""
+        rB, rC, rH, rW = recon.shape
+        tB, tC, tH, tW = target.shape
+        # Only adjust H/W; assume batch/channel already aligned
+        # Crop if too large
+        if rH > tH:
+            dh = (rH - tH) // 2
+            recon = recon[:, :, dh:dh + tH, :]
+        if rW > tW:
+            dw = (rW - tW) // 2
+            recon = recon[:, :, :, dw:dw + tW]
+        # Pad if too small
+        rH2, rW2 = recon.shape[2], recon.shape[3]
+        padH = tH - rH2
+        padW = tW - rW2
+        if padH > 0 or padW > 0:
+            pad_left = padW // 2 if padW > 0 else 0
+            pad_right = padW - pad_left if padW > 0 else 0
+            pad_top = padH // 2 if padH > 0 else 0
+            pad_bottom = padH - pad_top if padH > 0 else 0
+            recon = F.pad(recon, (pad_left, pad_right, pad_top, pad_bottom))
+        return recon
+
     class Autoencoder(nn.Module):
         def __init__(self, latent_dim):
             super(Autoencoder, self).__init__()
             self.conv1 = nn.Conv2d(1, 4, 3, padding=1)
             self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
             self.conv3 = nn.Conv2d(8, n_channels, 3, padding=1)
+            # Optional extra conv at deepest stage (keeps H,W unchanged)
+            if use_extra_conv:
+                self.conv4 = nn.Conv2d(n_channels, n_channels, 3, padding=1)
             self.t_conv1 = nn.ConvTranspose2d(n_channels, 8, 2, stride=2)
             self.t_conv2 = nn.ConvTranspose2d(8, 4, 2, stride=2)
             self.t_conv3 = nn.ConvTranspose2d(4, 1, [2, 2], stride=[2, 2], output_padding=[1, 0])
@@ -226,6 +323,8 @@ for folder in savedir:
             x = torch.nn.functional.relu(self.conv2(x))
             x = self.pool(x)
             x = torch.nn.functional.relu(self.conv3(x))
+            if use_extra_conv:
+                x = torch.nn.functional.relu(self.conv4(x))
             x = self.pool(x)
             x = x.view(-1, nel_reduced)
             latent = torch.nn.functional.relu(self.fc1(x))
@@ -233,7 +332,7 @@ for folder in savedir:
             x = x.view(-1, n_channels, nrow_reduced, ncol_reduced)
             x = torch.nn.functional.relu(self.t_conv1(x))
             x = torch.nn.functional.relu(self.t_conv2(x))
-            output = self.t_conv3(x)  # REMOVED SIGMOID - allows unbounded outputs for better reconstruction
+            output = self.t_conv3(x)  # REMOVED SIGMOID - raw outputs allow broader reconstruction range
             return output, latent
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -241,12 +340,33 @@ for folder in savedir:
     autoencoder = Autoencoder(latent_dim=latent_dim).to(device)
     autoencoder = autoencoder.float()
     criterion = nn.MSELoss(reduction='mean')
+    # CHANGE: allow switching between MSE (default) and L1
+    criterion = nn.L1Loss(reduction='mean') if args.l1_loss else nn.MSELoss(reduction='mean')
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
     autoencoder.to(device)
     for i in range(torch.cuda.device_count()):
         print(torch.cuda.get_device_properties(i).name)
     Losses = []
     ValLosses = []
+    PSNRs = []  # CHANGE: track PSNR
+
+    # CHANGE: Initial sanity logging before training loop
+    try:
+        autoencoder.eval()
+        with torch.no_grad():
+            sample_loader = val_dataloader if len(val_dataloader) > 0 else train_dataloader
+            for batch in sample_loader:
+                sample0 = batch.to(device)
+                recon0, _ = autoencoder(sample0.float())
+                recon0 = match_shape(recon0, sample0)
+                break
+        cols0 = min(6, sample0.size(0))
+        grid_orig0 = make_grid(sample0[:cols0].detach().cpu(), nrow=cols0, normalize=True, scale_each=True)
+        grid_recon0 = make_grid(recon0[:cols0].detach().cpu(), nrow=cols0, normalize=True, scale_each=True)
+        writer.add_image('Sanity/Originals_BeforeTrain', grid_orig0, 0)
+        writer.add_image('Sanity/Recons_BeforeTrain', grid_recon0, 0)
+    except Exception as e:
+        print(f"Sanity logging skipped: {e}")
     num_epochs = args.epochs
     for epoch in range(num_epochs):
         train_loss_total = 0.0
@@ -258,6 +378,7 @@ for folder in savedir:
             data = data.to(device)
             optimizer.zero_grad()
             outputs, latent = autoencoder(data.float())
+            outputs = match_shape(outputs, data)  # CHANGE: enforce exact shape match before loss
             loss = criterion(outputs, data.float())
             loss.backward()
             optimizer.step()
@@ -266,23 +387,64 @@ for folder in savedir:
             for data in train_dataloader:
                 data = data.to(device)
                 train_outputs, _ = autoencoder(data.float())
+                train_outputs = match_shape(train_outputs, data)  # CHANGE
                 train_loss = criterion(train_outputs, data.float())
                 train_loss_total += train_loss.item()
         with torch.no_grad():
+            # CHANGE: also compute PSNR from MSE on validation
+            psnr_vals = []
             for val_data in val_dataloader:
                 val_data = val_data.to(device)
                 val_outputs, _ = autoencoder(val_data.float())
+                val_outputs = match_shape(val_outputs, val_data)  # CHANGE
                 val_loss = criterion(val_outputs, val_data.float())
                 val_loss_total += val_loss.item()
+                # Compute PSNR based on MSE
+                mse_batch = torch.mean((val_outputs - val_data) ** 2).detach().item()
+                if args.normalize:
+                    max_val = 1.0
+                else:
+                    # Use dynamic max to estimate peak value; guard small values
+                    max_val = max(1e-8, float(val_data.max().detach().cpu().item()))
+                mse_eps = max(mse_batch, 1e-12)
+                import math as _math
+                psnr_vals.append(20.0 * _math.log10(max_val) - 10.0 * _math.log10(mse_eps))
         train_loss_avg = train_loss_total / max(1, num_train_batches)
         val_loss_avg = val_loss_total / max(1, num_val_batches)
         Losses.append(train_loss_avg)
         ValLosses.append(val_loss_avg)
+        # CHANGE: epoch PSNR (average over val batches)
+        if psnr_vals:
+            psnr_epoch = float(sum(psnr_vals) / len(psnr_vals))
+            PSNRs.append(psnr_epoch)
+            print(f'  PSNR (val avg): {psnr_epoch:.2f} dB')
         print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {train_loss_avg:.4f}, Validation Loss: {val_loss_avg:.4f}')
+        # CHANGE: Per-epoch reconstruction logging (first batch of val)
+        try:
+            autoencoder.eval()
+            with torch.no_grad():
+                for batch in val_dataloader:
+                    sample = batch.to(device)
+                    recon_epoch, _ = autoencoder(sample.float())
+                    recon_epoch = match_shape(recon_epoch, sample)  # CHANGE
+                    break
+            cols_ep = min(6, sample.size(0))
+            grid_orig_ep = make_grid(sample[:cols_ep].detach().cpu(), nrow=cols_ep, normalize=True, scale_each=True)
+            grid_recon_ep = make_grid(recon_epoch[:cols_ep].detach().cpu(), nrow=cols_ep, normalize=True, scale_each=True)
+            writer.add_image('EpochRecon/Originals', grid_orig_ep, epoch + 1)
+            writer.add_image('EpochRecon/Recons', grid_recon_ep, epoch + 1)
+        except Exception as e:
+            print(f"Epoch reconstruction logging skipped: {e}")
 
     # TensorBoard: log per-epoch losses
     writer.add_scalar('Loss/train', train_loss_avg, epoch + 1)
     writer.add_scalar('Loss/val', val_loss_avg, epoch + 1)
+    # CHANGE: Log PSNR if computed
+    try:
+        if len(PSNRs) >= (epoch + 1) and not (np.isnan(PSNRs[-1]) if PSNRs else True):
+            writer.add_scalar('Metrics/PSNR_val', PSNRs[-1], epoch + 1)
+    except Exception:
+        pass
     writer.flush()
 
     # Save model and plot for this dataset
