@@ -51,12 +51,12 @@ LATENT_DIM_DEFAULT = 128         # Dimensionality of latent space bottleneck
 EXTRA_CONV_DEFAULT = False       # Enable 4th conv layer (deeper feature extraction)
 
 # Training parameters
-EPOCHS_DEFAULT = 100             # Default number of training epochs
+EPOCHS_DEFAULT = 10             # Default number of training epochs
 LR_DEFAULT = 1e-3                # Default learning rate for Adam optimizer
 SEED_DEFAULT = 42                # Random seed for reproducible results
 
 # Output parameters
-NUMBER_OUTPUT_IMAGE_SAMPLES = 1000  # Number of spectrograms for JPEG panel generation
+NUMBER_OUTPUT_IMAGE_SAMPLES = 10  # Number of spectrograms for JPEG panel generation
 PANEL_GROUP_SIZE = 10              # Spectrograms per JPEG panel (columns)
 SHOW_ERROR_PLOTS = False           # Whether to include error row in reconstruction panels
 DEFAULT_VERSION_TAG = "01"         # Version identifier for output directory naming
