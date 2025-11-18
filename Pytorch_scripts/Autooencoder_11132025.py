@@ -5,7 +5,7 @@ Train and evaluate an improved autoencoder on SNR_gram spectrograms.
 COMPUTATIONAL ORDER:
 1. Parse command-line arguments (see main block at bottom)
 2. Create versioned output directory (Autoencoder_vXX_DateYYYYMMDD-HHMMSS.dir)
-3. Load dataset from specified directories (single or multiple)
+3. Load dataset from specified directory (single directory mode)
 4. Build and initialize autoencoder model architecture
 5. Train the model using batch-wise gradient descent
 6. Extract latent embeddings from trained model
@@ -14,12 +14,12 @@ COMPUTATIONAL ORDER:
 
 SCRIPT PURPOSE:
 - Trains an improved autoencoder WITHOUT sigmoid constraints (allows unbounded output)
-- Supports both in-memory training (small datasets) and DataLoader-based training (large datasets)
+- Uses DataLoader-based training for efficient memory usage
 - Generates reconstruction quality plots comparing input vs output
 - Performs t-SNE visualization of latent space with optional KMeans clustering
 - Saves trained model weights for later use with Apply_Autoencoder.py
 - Creates JPEG panels showing reconstruction quality on random samples
-- All outputs saved to timestamped directory for reproducibility
+- All outputs saved to timestamped directory in runs/ folder for reproducibility
 """
 import torch
 import torch.nn as nn
@@ -32,6 +32,7 @@ import torch.nn.functional as F
 from scipy.io import loadmat, savemat
 from torch.utils.data import Dataset, DataLoader
 from datetime import datetime
+import time
 try:
     from sklearn.manifold import TSNE  # optional; fallback to PCA if unavailable
     from sklearn.cluster import KMeans  # optional; for clustering
@@ -47,7 +48,7 @@ import argparse
 
 # Architecture parameters
 CHANNELS_DEFAULT = 64           # Base number of channels in convolutional layers
-LATENT_DIM_DEFAULT = 128         # Dimensionality of latent space bottleneck
+LATENT_DIM_DEFAULT = 64         # Dimensionality of latent space bottleneck
 EXTRA_CONV_DEFAULT = False       # Enable 4th conv layer (deeper feature extraction)
 
 # Training parameters
@@ -56,10 +57,11 @@ LR_DEFAULT = 1e-3                # Default learning rate for Adam optimizer
 SEED_DEFAULT = 42                # Random seed for reproducible results
 
 # Output parameters
-NUMBER_OUTPUT_IMAGE_SAMPLES = 10  # Number of spectrograms for JPEG panel generation
-PANEL_GROUP_SIZE = 10              # Spectrograms per JPEG panel (columns)
+NUMBER_OUTPUT_IMAGE_SAMPLES = 30  # Number of spectrograms for JPEG panel generation
+PANEL_GROUP_SIZE = 3              # Spectrograms per JPEG panel (columns)
 SHOW_ERROR_PLOTS = False           # Whether to include error row in reconstruction panels
-DEFAULT_VERSION_TAG = "01"         # Version identifier for output directory naming
+DEFAULT_VERSION_TAG = "02"         # Version identifier for output directory naming
+TSNE_MAX_SAMPLES = 30            # Maximum samples to use for t-SNE (to avoid slowdown)
 
 
 # ============================================================================
@@ -91,7 +93,8 @@ def create_output_directory(version_tag: str | None = None) -> str:
     Create and return the unique output directory for this training run.
     
     RUNS DURING STEP 2: Creates Autoencoder_vXX_DateYYYYMMDD-HHMMSS.dir folder
-    where all outputs (model weights, plots, JPEG panels) will be saved.
+    in the repository's results/ directory where all outputs (model weights, plots, 
+    JPEG panels) will be saved.
     
     Args:
         version_tag: Version identifier (default: "01")
@@ -102,7 +105,14 @@ def create_output_directory(version_tag: str | None = None) -> str:
     tag = (version_tag or DEFAULT_VERSION_TAG).strip().replace(' ', '_')
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dir_name = f"Autoencoder_v{tag}_Date{timestamp}.dir"
-    output_dir = os.path.join(os.getcwd(), dir_name)
+
+    # Navigate to repository root and create in results/ folder
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(script_dir)  # Go up one level from Pytorch_scripts/
+    results_dir = os.path.join(repo_root, "results")
+    os.makedirs(results_dir, exist_ok=True)
+    
+    output_dir = os.path.join(results_dir, dir_name)
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
@@ -287,25 +297,29 @@ class ImprovedAutoencoder(nn.Module):
         c3 = base_channels * 4
         c4 = base_channels * 8  # Only used if extra_conv=True
         
+        # *** NOTE: BatchNorm2d normalizes FEATURE MAPS, not input data ***
+        # BatchNorm normalizes intermediate activations for training stability
+        # This is DIFFERENT from the input data normalization done in _minmax_norm()
+        
         if extra_conv:
             self.encoder = nn.Sequential(
                 nn.Conv2d(1, c1, 3, padding=1),
-                nn.BatchNorm2d(c1),
+                nn.BatchNorm2d(c1),  # <-- Normalizes feature channels, NOT input pixels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
                 
                 nn.Conv2d(c1, c2, 3, padding=1),
-                nn.BatchNorm2d(c2),
+                nn.BatchNorm2d(c2),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
                 
                 nn.Conv2d(c2, c3, 3, padding=1),
-                nn.BatchNorm2d(c3),
+                nn.BatchNorm2d(c3),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
                 
                 nn.Conv2d(c3, c4, 3, padding=1),
-                nn.BatchNorm2d(c4),
+                nn.BatchNorm2d(c4),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
             )
@@ -313,17 +327,17 @@ class ImprovedAutoencoder(nn.Module):
         else:
             self.encoder = nn.Sequential(
                 nn.Conv2d(1, c1, 3, padding=1),
-                nn.BatchNorm2d(c1),
+                nn.BatchNorm2d(c1),  # <-- Normalizes feature channels, NOT input pixels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
                 
                 nn.Conv2d(c1, c2, 3, padding=1),
-                nn.BatchNorm2d(c2),
+                nn.BatchNorm2d(c2),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
                 
                 nn.Conv2d(c2, c3, 3, padding=1),
-                nn.BatchNorm2d(c3),
+                nn.BatchNorm2d(c3),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
             )
@@ -343,6 +357,7 @@ class ImprovedAutoencoder(nn.Module):
         )
         
         # Decoder without final activation
+        # *** NOTE: BatchNorm2d here also normalizes FEATURE MAPS, not output data ***
         if extra_conv:
             # Calculate output padding for final layer (must be < stride)
             # After 4x upsampling with stride 2, we go from nrow_reduced to nrow_reduced*16
@@ -352,19 +367,20 @@ class ImprovedAutoencoder(nn.Module):
             
             self.decoder = nn.Sequential(
                 nn.ConvTranspose2d(c4, c3, 2, stride=2),
-                nn.BatchNorm2d(c3),
+                nn.BatchNorm2d(c3),  # <-- Normalizes feature channels, NOT output pixels
                 nn.ReLU(inplace=True),
                 
                 nn.ConvTranspose2d(c3, c2, 2, stride=2),
-                nn.BatchNorm2d(c2),
+                nn.BatchNorm2d(c2),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 
                 nn.ConvTranspose2d(c2, c1, 2, stride=2),
-                nn.BatchNorm2d(c1),
+                nn.BatchNorm2d(c1),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 
                 nn.ConvTranspose2d(c1, 1, 2, stride=2, output_padding=(pad_h, pad_w)),
-                # No sigmoid: Allow unbounded output
+                # *** No sigmoid: Output is UNBOUNDED (can be any value, not just 0-1) ***
+                # Model learns to output values matching the normalized input range (~0-1)
             )
         else:
             # Calculate output padding for 3-layer case
@@ -373,15 +389,16 @@ class ImprovedAutoencoder(nn.Module):
             
             self.decoder = nn.Sequential(
                 nn.ConvTranspose2d(c3, c2, 2, stride=2),
-                nn.BatchNorm2d(c2),
+                nn.BatchNorm2d(c2),  # <-- Normalizes feature channels, NOT output pixels
                 nn.ReLU(inplace=True),
                 
                 nn.ConvTranspose2d(c2, c1, 2, stride=2),
-                nn.BatchNorm2d(c1),
+                nn.BatchNorm2d(c1),  # <-- Normalizes feature channels
                 nn.ReLU(inplace=True),
                 
                 nn.ConvTranspose2d(c1, 1, 2, stride=2, output_padding=(pad_h, pad_w)),
-                # No sigmoid:  Allow unbounded output
+                # *** No sigmoid: Output is UNBOUNDED (can be any value, not just 0-1) ***
+                # Model learns to output values matching the normalized input range (~0-1)
             )
         
         self.flat_size = flat_size
@@ -423,6 +440,11 @@ def _minmax_norm(im: np.ndarray, auto_skip_if_unit: bool = True) -> np.ndarray:
     RUNS DURING DATA LOADING: Applied to each spectrogram as it's loaded
     from .mat files to ensure consistent input scaling across dataset.
     
+    *** THIS IS WHERE INPUT DATA NORMALIZATION HAPPENS ***
+    This normalizes the RAW spectrogram values to [0,1] range BEFORE
+    they are fed into the autoencoder. This is NOT the same as BatchNorm
+    in the model - this normalizes the actual pixel/amplitude values.
+    
     Args:
         im: Input image array (2D spectrogram)
         auto_skip_if_unit: If True, skip normalization if data already in [0,1]
@@ -438,13 +460,15 @@ def _minmax_norm(im: np.ndarray, auto_skip_if_unit: bool = True) -> np.ndarray:
         return np.zeros_like(im, dtype=np.float32)
     if auto_skip_if_unit and (-1e-4 <= im_min <= 1.0 + 1e-4) and (-1e-4 <= im_max <= 1.0 + 1e-4):
         return im
+    # *** MIN-MAX NORMALIZATION FORMULA: (x - min) / (max - min) ***
+    # This scales all values to [0, 1] range
     return (im - im_min) / rng
 
 # ============================================================================
-# DATASET CLASSES (PyTorch Dataset implementations for .mat file loading)
+# DATASET CLASSES (PyTorch Dataset implementation for .mat file loading)
 # ============================================================================
 
-class CombinedSNRDataset(Dataset):
+class SNRDataset(Dataset):
     """
     PyTorch Dataset for loading SNR_gram .mat files on-demand from disk.
     
@@ -452,57 +476,50 @@ class CombinedSNRDataset(Dataset):
     on-demand in __getitem__(). This allows training on datasets that don't
     fit entirely in RAM.
     
-    MULTI-DIRECTORY SUPPORT: Can combine spectrograms from multiple folders,
-    assigning labels based on source directory (e.g., label 0 for airguns,
-    label 1 for whale calls).
-    
     SHAPE VALIDATION: Automatically filters files to ensure all spectrograms
     have consistent dimensions (required for batching).
     
     Args:
-        directories: List of directory paths to scan for .mat files
+        directory: Directory path to scan for .mat files
         normalize: Whether to apply per-image min-max normalization
         seed: Random seed for shuffling file order
-        show_summary: Print dataset statistics (file counts per label)
+        show_summary: Print dataset statistics (file count)
     """
-    def __init__(self, directories: list[str], normalize: bool = True, 
+    def __init__(self, directory: str, normalize: bool = True, 
                  seed: int | None = None, show_summary: bool = False):
         """
         Args:
-            directories: List of directory paths to scan for .mat files
+            directory: Directory path to scan for .mat files
             normalize: Whether to apply per-image min-max normalization
             seed: Random seed for shuffling file order
             show_summary: Print dataset statistics
         """
         self.normalize = normalize
         self.file_paths: list[str] = []
-        self.labels: list[int] = []
         
-        # Scan each directory and determine target shape from first valid file
+        # Scan directory and determine target shape from first valid file
         target_shape = None
-        for dir_idx, root in enumerate(directories):
-            mat_files = sorted(glob.glob(os.path.join(root, '**', '*.mat'), recursive=True))
-            
-            for fp in mat_files:
-                try:
-                    m = loadmat(fp)
-                    im = m.get('SNR_gram', None)
-                    if im is None or not isinstance(im, np.ndarray) or im.ndim != 2:
-                        continue
-                    
-                    # Set target shape from first valid file
-                    if target_shape is None:
-                        target_shape = im.shape
-                    
-                    # Only include files matching target shape
-                    if im.shape == target_shape:
-                        self.file_paths.append(fp)
-                        self.labels.append(dir_idx)
-                except Exception:
+        mat_files = sorted(glob.glob(os.path.join(directory, '**', '*.mat'), recursive=True))
+        
+        for fp in mat_files:
+            try:
+                m = loadmat(fp)
+                im = m.get('SNR_gram', None)
+                if im is None or not isinstance(im, np.ndarray) or im.ndim != 2:
                     continue
+                
+                # Set target shape from first valid file
+                if target_shape is None:
+                    target_shape = im.shape
+                
+                # Only include files matching target shape
+                if im.shape == target_shape:
+                    self.file_paths.append(fp)
+            except Exception:
+                continue
         
         if not self.file_paths:
-            raise RuntimeError(f"No valid .mat files found in {directories}")
+            raise RuntimeError(f"No valid .mat files found in {directory}")
         
         self.target_shape = target_shape
         
@@ -511,15 +528,9 @@ class CombinedSNRDataset(Dataset):
             rng = np.random.default_rng(seed)
             indices = rng.permutation(len(self.file_paths))
             self.file_paths = [self.file_paths[i] for i in indices]
-            self.labels = [self.labels[i] for i in indices]
         
         if show_summary:
-            print(f"CombinedSNRDataset: {len(self)} files with shape {target_shape}")
-            label_counts = {}
-            for label in self.labels:
-                label_counts[label] = label_counts.get(label, 0) + 1
-            for label, count in sorted(label_counts.items()):
-                print(f"  Label {label}: {count} files")
+            print(f"SNRDataset: {len(self)} files with shape {target_shape}")
     
     def __len__(self):
         return len(self.file_paths)
@@ -531,41 +542,39 @@ class CombinedSNRDataset(Dataset):
         CALLED DURING TRAINING: PyTorch DataLoader calls this method for each
         sample in each batch during training iterations.
         
+        *** DATA NORMALIZATION HAPPENS HERE (if normalize=True) ***
+        
         Returns:
-            tensor: Spectrogram as (1, H, W) tensor
-            label: Integer label indicating source directory
+            tensor: Spectrogram as (1, H, W) tensor, NORMALIZED to [0,1] if normalize=True
+            label: Always 0 (single dataset mode)
         """
         fp = self.file_paths[idx]
-        label = self.labels[idx]
         
         try:
             m = loadmat(fp)
             im = m['SNR_gram']
             
+            # *** INPUT DATA NORMALIZATION: Scales raw spectrogram to [0,1] ***
             if self.normalize:
-                im = _minmax_norm(im)
+                im = _minmax_norm(im)  # <-- NORMALIZATION APPLIED HERE
             else:
                 im = im.astype(np.float32)
             
             # Convert to tensor (C, H, W) format
             tensor = torch.from_numpy(im).unsqueeze(0)  # Add channel dimension
-            return tensor, label
+            return tensor, 0  # Label always 0 for single dataset
             
         except Exception as e:
             # If loading fails, return zeros (should be rare with pre-validated files)
             print(f"Warning: Failed to load {fp}: {e}")
             h, w = self.target_shape
-            return torch.zeros((1, h, w), dtype=torch.float32), label
-    
-    def get_with_label(self, idx):
-        """Alias for __getitem__ that explicitly returns (data, label)."""
-        return self.__getitem__(idx)
+            return torch.zeros((1, h, w), dtype=torch.float32), 0
 
 # ============================================================================
 # DATA LOADING FUNCTIONS (Legacy functions for in-memory loading)
 # ============================================================================
 # NOTE: These functions load entire datasets into RAM. For large datasets,
-# prefer using CombinedSNRDataset with DataLoader (--load-all flag disabled).
+# prefer using SNRDataset with DataLoader for batch-wise streaming from disk.
 
 def load_snrgrams_from_folder(root: str, n_samples: int = 8, normalize: bool = True,
                               seed: int | None = None, show_files: bool = False):
@@ -856,11 +865,15 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     # ========================================================================
     # STEP 1: Initialize random seed and create output directory
     # ========================================================================
+    # Start timing the entire run
+    script_start_time = time.time()
+    
     # Ensure deterministic behavior for initialization and any stochastic ops
     if seed is not None:
         set_global_seed(int(seed))
     output_dir = create_output_directory(version_tag)
     print(f"Run artifacts will be stored in: {output_dir}")
+    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # ========================================================================
     # STEP 2: Load dataset from directory
@@ -869,7 +882,9 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     dataset_label = os.path.basename(data_dir.rstrip('/'))
     
     # Use Dataset class to preserve filenames for panel generation
-    dataset = CombinedSNRDataset([data_dir], normalize=normalize, seed=seed, show_summary=True)
+    # *** NORMALIZATION IS APPLIED DURING DATA LOADING (in SNRDataset.__getitem__) ***
+    # Each .mat file is loaded and normalized to [0,1] range here
+    dataset = SNRDataset(data_dir, normalize=normalize, seed=seed, show_summary=True)
     
     # Create DataLoader for training
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
@@ -881,9 +896,10 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     viz_samples = min(tsne_samples, len(dataset))
     print(f"Loading {viz_samples} samples for visualization...")
     
+    # *** These samples are ALREADY NORMALIZED (from dataset.__getitem__) ***
     data_list = []
     for i in range(viz_samples):
-        sample, _ = dataset[i]
+        sample, _ = dataset[i]  # <-- Calls __getitem__ which applies _minmax_norm()
         data_list.append(sample.unsqueeze(0))
     data_tensor = torch.cat(data_list, dim=0) if data_list else None
     
@@ -933,7 +949,9 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
         model.train()
         
         losses = []
+        epoch_times = []
         for epoch in range(epochs):
+            epoch_start = time.time()
             epoch_loss = 0.0
             batch_count = 0
             
@@ -952,13 +970,20 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
             avg_loss = epoch_loss / batch_count if batch_count > 0 else 0.0
             losses.append(avg_loss)
             
+            epoch_time = time.time() - epoch_start
+            epoch_times.append(epoch_time)
+            
             # Output stats to detect collapse (sample from last batch)
             with torch.no_grad():
                 o_min = float(output.min().cpu())
                 o_max = float(output.max().cpu())
                 o_mean = float(output.mean().cpu())
             if epoch % 10 == 0:
-                print(f"  {model_name} Epoch {epoch}: Loss={avg_loss:.4f} out[min={o_min:.3f}, max={o_max:.3f}, mean={o_mean:.3f}]")
+                print(f"  {model_name} Epoch {epoch}: Loss={avg_loss:.4f} out[min={o_min:.3f}, max={o_max:.3f}, mean={o_mean:.3f}] time={epoch_time:.1f}s")
+        
+        total_training_time = sum(epoch_times)
+        avg_epoch_time = total_training_time / len(epoch_times) if epoch_times else 0
+        print(f"\n  {model_name} Training complete: {total_training_time:.1f}s total, {avg_epoch_time:.1f}s avg per epoch")
         
         return losses
     
@@ -966,7 +991,9 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     # STEP 5: Train model and save weights
     # ========================================================================
     print("\nTraining improved model...")
+    training_start_time = time.time()
     improved_losses = quick_train(improved_model, train_loader, epochs=epochs, lr=lr, model_name="improved", progress_interval=progress_interval)
+    training_elapsed = time.time() - training_start_time
     
     # Save trained model weights to output directory
     model_path = os.path.join(output_dir, 'improved_autoencoder.pth')
@@ -976,20 +1003,23 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     # ========================================================================
     # STEP 6: Extract latent embeddings from all data
     # ========================================================================
-    # Extract latent embeddings from ALL data for t-SNE
+    # Extract latent embeddings from subset of data for t-SNE (full dataset is too slow)
     improved_model.eval()  # Set to evaluation mode
     
-    print(f"\nExtracting latent embeddings from all {len(dataset)} samples for t-SNE...")
+    # Limit t-SNE to TSNE_MAX_SAMPLES to avoid excessive computation time
+    tsne_sample_count = min(TSNE_MAX_SAMPLES, len(dataset))
+    print(f"\nExtracting latent embeddings from {tsne_sample_count} samples for t-SNE (limited from {len(dataset)} total)...")
     all_latent = []
     
     with torch.no_grad():
-        for i, (sample, label) in enumerate(dataset):
+        for i in range(tsne_sample_count):
+            sample, label = dataset[i]
             sample_batch = sample.unsqueeze(0)  # Add batch dimension
             _, latent = improved_model(sample_batch)
             all_latent.append(latent.cpu())
             
-            if (i + 1) % 5000 == 0:
-                print(f"  Processed {i + 1}/{len(dataset)} samples...")
+            if (i + 1) % 1000 == 0:
+                print(f"  Processed {i + 1}/{tsne_sample_count} samples...")
     
     # Combine all latent vectors
     improved_latent_full = torch.cat(all_latent, dim=0)
@@ -1004,6 +1034,7 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     # STEP 7: Generate visualization plots and export results
     # ========================================================================
     # Convert tensor to numpy for visualization
+    # *** THIS DATA IS NORMALIZED: Shows values in [0,1] range, not raw amplitudes ***
     data_np = data_tensor.squeeze(1).numpy()  # Remove channel dimension for plotting
     
     # Print value ranges for debugging
@@ -1016,6 +1047,7 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     # ========================================================================
     # Create reconstruction figure for inputs vs improved outputs
     # Use consistent vmin/vmax across all plots for fair comparison
+    # *** PLOTS SHOW NORMALIZED DATA: All values are in [0,1] range ***
     vmin_data = data_np.min()
     vmax_data = data_np.max()
     
@@ -1042,12 +1074,12 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     
     # Determine number of conv layers in improved model
     n_conv_layers = 4 if extra_conv else 3
-    plt.suptitle(f'Autoencoder Reconstructions (latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers})')
+    plt.suptitle(f'Autoencoder Reconstructions (latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers}, epochs={epochs})')
     plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
     plt.tight_layout()
     recon_fig_path = os.path.join(output_dir, 'autoencoder_improved.png')
     plt.savefig(recon_fig_path, dpi=200, bbox_inches='tight')
-    plt.show()
+    plt.close()  # Close instead of show - don't wait for user interaction
     
     # ========================================================================
     # PLOT 2: Training loss curve
@@ -1058,22 +1090,22 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     plt.plot(improved_losses, label='Improved')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title(f'Training Loss latent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers}')
+    plt.title(f'Training Loss (epochs={epochs})\nlatent_dim={latent_dim}, channels={channels}, conv_layers={n_conv_layers}')
     plt.yscale('log')
     plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
     plt.tight_layout()
     training_fig_path = os.path.join(output_dir, 'training_improved.png')
     plt.savefig(training_fig_path, dpi=150)
-    plt.show()
+    plt.close()  # Close instead of show - don't wait for user interaction
     
     # ========================================================================
     # PLOT 3: t-SNE latent space visualization with clustering
     # ========================================================================
     # Latent t-SNE visualization with optional clustering
     try:
-        # Use full dataset embeddings
+        # Use subset of embeddings (limited by TSNE_MAX_SAMPLES for speed)
         imp_z = improved_latent_full.detach().cpu().numpy()
-        print(f"\nComputing t-SNE on {len(imp_z)} samples from full dataset...")
+        print(f"\nComputing t-SNE on {len(imp_z)} samples (limited for performance)...")
         
         n = imp_z.shape[0]
         if n >= 2:
@@ -1121,14 +1153,14 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
             colors = np.where(clusters == 0, '#1f77b4', '#ff7f0e')
             plt.figure(figsize=(6, 5))
             plt.scatter(emb[:, 0], emb[:, 1], c=colors, alpha=0.85, s=28)
-            plt.title(f'Improved latent t-SNE (k={k_clusters})\nlatent_dim={latent_dim}, channels={channels}, perplexity={perplexity:.1f}')
+            plt.title(f'Improved latent t-SNE (k={k_clusters}, epochs={epochs})\nlatent_dim={latent_dim}, channels={channels}, perplexity={perplexity:.1f}')
             plt.xlabel('t-SNE 1')
             plt.ylabel('t-SNE 2')
             plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
             plt.tight_layout()
             tsne_path = os.path.join(output_dir, 'improved_latent_tsne.png')
             plt.savefig(tsne_path, dpi=160)
-            plt.show()
+            plt.close()  # Close instead of show - don't wait for user interaction
     except Exception as e:
         print(f"Warning: latent t-SNE plotting skipped due to error: {e}")
     
@@ -1165,6 +1197,47 @@ def compare_autoencoder_performance(data_dir: str, n_samples: int = 8, normalize
     mat_path = os.path.join(output_dir, 'autoencoder_reconstruction_data.mat')
     savemat(mat_path, sample_data)
     print(f"Saved reconstruction data to {mat_path}")
+    
+    # ========================================================================
+    # EXPORT 3: Save timing log
+    # ========================================================================
+    script_elapsed = time.time() - script_start_time
+    end_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    timing_log = [
+        f"Autoencoder Training Run",
+        f"========================",
+        f"Start time: {datetime.fromtimestamp(script_start_time).strftime('%Y-%m-%d %H:%M:%S')}",
+        f"End time: {end_time}",
+        f"Total runtime: {script_elapsed:.1f}s ({script_elapsed/60:.1f}min)",
+        f"",
+        f"Training Configuration:",
+        f"  Dataset: {dataset_label}",
+        f"  Total files: {len(dataset)}",
+        f"  Epochs: {epochs}",
+        f"  Learning rate: {lr}",
+        f"  Batch size: {batch_size}",
+        f"  Latent dim: {latent_dim}",
+        f"  Channels: {channels}",
+        f"",
+        f"Timing Breakdown:",
+        f"  Training time: {training_elapsed:.1f}s ({training_elapsed/60:.1f}min)",
+        f"  Time per epoch: {training_elapsed/epochs:.1f}s",
+        f"  Other operations: {script_elapsed - training_elapsed:.1f}s",
+        f"",
+        f"Final Loss: {improved_losses[-1]:.6f}",
+    ]
+    
+    timing_path = os.path.join(output_dir, 'timing_log.txt')
+    with open(timing_path, 'w') as f:
+        f.write('\n'.join(timing_log))
+    
+    print(f"\n{'='*60}")
+    print(f"Run complete! Total time: {script_elapsed:.1f}s ({script_elapsed/60:.1f}min)")
+    print(f"  Training: {training_elapsed:.1f}s ({training_elapsed/60:.1f}min)")
+    print(f"  Other: {script_elapsed - training_elapsed:.1f}s")
+    print(f"Timing log saved to: {timing_path}")
+    print(f"{'='*60}")
 
 # ============================================================================
 # SCRIPT ENTRY POINT
@@ -1177,7 +1250,7 @@ if __name__ == "__main__":
     # Parse all command-line arguments for configuration
     parser = argparse.ArgumentParser(description="Compare AEs on real SNR_gram data")
     parser.add_argument("--data-dir", 
-                       default="/Volumes/Bowhead2/11132025_Datasets/Unsupervised_database_Balanced.dir", 
+                       default="/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_Balanced.dir", 
                        help="Root folder containing .mat files")
     parser.add_argument("--n-samples", type=int, default=15, help="Number of samples for reconstruction visualization")
     parser.add_argument("--tsne-samples", type=int, default=None, 
