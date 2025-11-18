@@ -8,8 +8,8 @@
 %param.spec.debug_plot=true;
 %Itemp=Imiss;
 
-param.spec.debug_plot=false;
-if param.spec.debug_plot
+param.spec.debug_missed_manual=false;
+if param.spec.debug_missed_manual
     fprintf('Displaying %i missed manual detections\n',length(Imiss));
 
     for I=1:length(Imiss)

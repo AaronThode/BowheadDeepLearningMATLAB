@@ -1,11 +1,7 @@
-%%%%%master_convert_manual_archive_to_spectrograms.m%%%
+%%%%%master_create_tdrift_table.m%%%
+%  Goes through GSI files and copies tdrift information
+%  to allow future use by WAV file versions.
 %
-%
-% Key points to remember when making spectrograms:
-%       (1) They must be equalized;
-%       (2) If not equalized they must be calibrated by the DASAR
-%       calibation curve.
-%       (3) They must be saved in uint16 to save as much space as possible.
 
 close all
 clear
