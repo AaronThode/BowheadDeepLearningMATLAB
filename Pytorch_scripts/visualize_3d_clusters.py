@@ -64,36 +64,58 @@ def compute_3d_embedding(latent: np.ndarray, method: str = 'tsne',
         - 'umap': UMAP in 3D (faster, preserves both local and global structure)
         - 'pca': PCA to 3D (fastest, linear projection)
     """
-    print(f"\nComputing 3D embedding using {method.upper()}...")
+    print(f"\n{'='*60}")
+    print(f"Computing 3D embedding using {method.upper()}...")
+    print(f"Processing {latent.shape[0]:,} samples with {latent.shape[1]}-dim latent vectors")
+    print(f"{'='*60}")
     
     if method == 'tsne':
         if TSNE is None:
             raise ImportError("sklearn not available. Install with: pip install scikit-learn")
         perplexity = min(perplexity, (latent.shape[0] - 1) / 3.0)
         perplexity = max(2.0, min(perplexity, latent.shape[0] - 1))
-        print(f"  Using perplexity={perplexity:.1f}")
+        print(f"t-SNE parameters: perplexity={perplexity:.1f}")
+        print(f"This may take 5-15 minutes for large datasets...")
+        import time
+        start = time.time()
         emb_3d = TSNE(n_components=3, random_state=random_state, 
                       perplexity=perplexity, learning_rate='auto').fit_transform(latent)
+        elapsed = time.time() - start
+        print(f"✓ t-SNE completed in {elapsed:.1f}s ({elapsed/60:.1f}min)")
     
     elif method == 'umap':
         if umap is None:
             raise ImportError("UMAP not available. Install with: pip install umap-learn")
         n_neighbors = min(15, latent.shape[0] - 1)
-        print(f"  Using n_neighbors={n_neighbors}")
+        print(f"UMAP parameters: n_neighbors={n_neighbors}")
+        if latent.shape[0] > 50000:
+            print(f"⚠ Large dataset - this may take 2-5 minutes...")
+        else:
+            print(f"Computing... (typically 10-30 seconds)")
+        import time
+        import sys
+        start = time.time()
+        sys.stdout.flush()  # Force output to appear
         emb_3d = umap.UMAP(n_components=3, random_state=random_state, 
-                          n_neighbors=n_neighbors).fit_transform(latent)
+                          n_neighbors=n_neighbors, verbose=True).fit_transform(latent)
+        elapsed = time.time() - start
+        print(f"✓ UMAP completed in {elapsed:.1f}s")
     
     elif method == 'pca':
-        print(f"  Computing PCA...")
+        print(f"Computing PCA... (instant)")
+        import time
+        start = time.time()
         pca = PCA(n_components=3, random_state=random_state)
         emb_3d = pca.fit_transform(latent)
+        elapsed = time.time() - start
         explained_var = pca.explained_variance_ratio_
-        print(f"  Explained variance: {explained_var[0]:.2%}, {explained_var[1]:.2%}, {explained_var[2]:.2%}")
+        print(f"✓ PCA completed in {elapsed:.2f}s")
+        print(f"  Explained variance: PC1={explained_var[0]:.1%}, PC2={explained_var[1]:.1%}, PC3={explained_var[2]:.1%}")
     
     else:
         raise ValueError(f"Unknown method: {method}. Use 'tsne', 'umap', or 'pca'")
     
-    print(f"3D embedding computed: shape={emb_3d.shape}")
+    print(f"✓ 3D embedding shape: {emb_3d.shape}")
     return emb_3d
 
 
@@ -209,12 +231,14 @@ def create_interactive_3d_plot(emb_3d: np.ndarray, clusters: np.ndarray,
     
     # Save as HTML
     if output_path:
+        print(f"Saving HTML file...")
         fig.write_html(output_path)
-        print(f"Saved interactive plot to: {output_path}")
-        print(f"  Open in browser to interact with the 3D visualization!")
+        print(f"✓ Saved interactive plot to: {output_path}")
+        print(f"  → Open this file in your browser to spin/zoom/interact!")
+        print(f"  → File path: {output_path}")
     
-    # Show in browser
-    fig.show()
+    # Don't auto-show (can hang) - user opens HTML manually
+    # fig.show()
     
     return fig
 
