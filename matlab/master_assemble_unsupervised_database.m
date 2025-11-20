@@ -14,17 +14,17 @@ data=load([database_folder '/Database_index.mat']);
 eval(sprintf('!mkdir %s/Unsupervised_database.dir',database_folder));
 eval(sprintf('!rm %s/Unsupervised_database.dir/*.mat',database_folder));
 
-Nsamples=5000;  %%Total data samples wanted in unsupervised database
-manual_fraction=0.50;  %%Fraction of samples that come from manual annotations
+Nsamples=50000;  %%Total data samples wanted in unsupervised database
+manual_fraction=0.95;  %%Fraction of samples that come from manual annotations
 include_airguns=true;  %%If true include spectrograms of likely airgun signals
 
-year_want={'10'};
-Site={'5'};
+year_want={'10','14'};
+Site={'3','5'};
 DASAR_strings={'A','D','G'};
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
 
 %index{Iyear,Isite,Iday,Ifold,I_d_directory};  Note that results NOT
-%               brokend down by DASAR
+%               broken down by DASAR
 %       file_fraction.manual_all=zeros(Iyear,Isite,Iday,Idasar,I_d_directory);  %Last index is maximum number of 'D' folders expected.
 %     
 
