@@ -55,7 +55,7 @@ LATENT_DIM_DEFAULT = 32
 EXTRA_CONV_DEFAULT = False
 
 # Training parameters (optimized for speed)
-EPOCHS_DEFAULT = 100             # Reduced for faster iterations
+EPOCHS_DEFAULT = 10              # Reduced for faster iterations
 LR_DEFAULT = 1e-3
 SEED_DEFAULT = 42
 
@@ -63,7 +63,7 @@ SEED_DEFAULT = 42
 NUMBER_OUTPUT_IMAGE_SAMPLES = 30   # Reduced from 5000 for faster JPEG generation
 PANEL_GROUP_SIZE = 3
 SHOW_ERROR_PLOTS = False
-DEFAULT_VERSION_TAG = "05_100E_32LD_MostlyManual"
+DEFAULT_VERSION_TAG = "04_32LD_MostlyManual"
 TSNE_MAX_SAMPLES = None  # None => use all samples in dataset
 
 
@@ -546,19 +546,56 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     if cols == 1:
         axes = np.expand_dims(axes, axis=1)
     
+    # Frequency axis parameters: 121 rows, start=27.3438 Hz, step=3.9062 Hz, max=500 Hz
+    freq_start = 27.3438
+    freq_step = 3.9062
+    freq_ticks = np.arange(0, nrow, 30)  # Show tick every 30 rows
+    freq_labels = [f'{freq_start + tick * freq_step:.0f}' for tick in freq_ticks]
+    
+    # Time axis parameters: 104 columns, each 0.026 seconds, total=2.7 seconds
+    time_step = 0.026
+    time_ticks = np.arange(0, ncol, 20)  # Show tick every 20 columns
+    time_labels = [f'{tick * time_step:.2f}' for tick in time_ticks]
+    
     for i in range(cols):
         axes[0, i].imshow(data_np[i], cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
         axes[0, i].set_title(f'Input {i+1}')
-        axes[0, i].axis('off')
+        if i == 0:  # Only show frequency axis on first column
+            axes[0, i].set_yticks(freq_ticks)
+            axes[0, i].set_yticklabels(freq_labels)
+            axes[0, i].set_ylabel('Frequency (Hz)')
+            axes[0, i].set_xticks(time_ticks)
+            axes[0, i].set_xticklabels(time_labels)
+            axes[0, i].set_xlabel('Time (s)')
+        else:
+            axes[0, i].axis('off')
+        
         imp_recon = improved_recon[i, 0].numpy()
         axes[1, i].imshow(imp_recon, cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
         axes[1, i].set_title('Reconstruction')
-        axes[1, i].axis('off')
+        if i == 0:  # Only show frequency axis on first column
+            axes[1, i].set_yticks(freq_ticks)
+            axes[1, i].set_yticklabels(freq_labels)
+            axes[1, i].set_ylabel('Frequency (Hz)')
+            axes[1, i].set_xticks(time_ticks)
+            axes[1, i].set_xticklabels(time_labels)
+            axes[1, i].set_xlabel('Time (s)')
+        else:
+            axes[1, i].axis('off')
+        
         if show_error:
             diff = np.abs(data_np[i] - imp_recon)
             axes[2, i].imshow(diff, cmap='hot', origin='lower', aspect='auto')
             axes[2, i].set_title('Error')
-            axes[2, i].axis('off')
+            if i == 0:  # Only show frequency axis on first column
+                axes[2, i].set_yticks(freq_ticks)
+                axes[2, i].set_yticklabels(freq_labels)
+                axes[2, i].set_ylabel('Frequency (Hz)')
+                axes[2, i].set_xticks(time_ticks)
+                axes[2, i].set_xticklabels(time_labels)
+                axes[2, i].set_xlabel('Time (s)')
+            else:
+                axes[2, i].axis('off')
     
     plt.suptitle(f'Autoencoder Reconstructions (epochs={epochs}, latent_dim={latent_dim})')
     plt.tight_layout()
@@ -684,23 +721,17 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     
     # ALWAYS save latent embeddings (even if t-SNE failed)
     print(f"Saving latent embeddings ({imp_z.shape[0]} samples, {imp_z.shape[1]}-dim)...")
-    
-    # Extract filenames from dataset (only basenames, matching embedding order)
-    filenames = np.array([os.path.basename(dataset.file_paths[i]) for i in range(tsne_sample_count)], dtype=object)
-    
     latent_data = {
         'latent_embeddings': imp_z,
         'tsne_embeddings': emb,
         'clusters': clusters,
         'optimal_k': optimal_k,
         'perplexity': perplexity,
-        'dataset_label': dataset_label,
-        'filenames': filenames
+        'dataset_label': dataset_label
     }
     embeddings_path = os.path.join(output_dir, 'latent_embeddings.mat')
     savemat(embeddings_path, latent_data)
     print(f"Saved latent embeddings to: {embeddings_path}")
-    print(f"  -> Includes 'filenames' field mapping {len(filenames)} embeddings to source files")
     print("  -> Use replot_tsne_from_saved.py to re-plot with different k values!")
     
     # STEP 7: Save JPEG reconstruction panels

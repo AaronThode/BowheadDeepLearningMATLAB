@@ -17,18 +17,54 @@ Pytorch_scripts/.venv*/
 Spectrogram_Image_Database.dir/
 Pytorch_scripts/Spectrogram_Image_Database.dir/
 
-# Optional: ignore local experiment outputs (comment out to include)
-# *.log
-*.asv
-*.mat
-*.jpg
-*.txt
+# Model files and training outputs (NEVER commit these!)
+*.pth
+*.h5
+*.pkl
+*.ckpt
+*.weights
 
-# Ignore PyTorch model outputs and training artifacts
+# Data files (NEVER commit these!)
+*.mat
+*.npy
+*.npz
+
+# Image outputs (NEVER commit these!)
+*.jpg
+*.jpeg
+*.png
+*.gif
+
+# Text logs and outputs
+*.log
+*.txt
+*.asv
+
+# Result directories (NEVER commit these!)
 Autoencoder_v*/
 *.dir/
 models/
 plots/
 runs/
 results/
+Pytorch_scripts/runs/
+Pytorch_scripts/models/
+Pytorch_scripts/plots/
+Pytorch_scripts/results/
+Pytorch_scripts/Misc_outputs*/
+Pytorch_scripts/Autoencoder_*/
+Pytorch_scripts/trained_models/
 
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exception: Keep essential MATLAB reference files (small)
+!GSI_header_table.mat
+
+*.pdf
