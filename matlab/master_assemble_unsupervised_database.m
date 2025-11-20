@@ -15,10 +15,10 @@ eval(sprintf('!mkdir %s/Unsupervised_database.dir',database_folder));
 eval(sprintf('!rm %s/Unsupervised_database.dir/*.mat',database_folder));
 
 Nsamples=50000;  %%Total data samples wanted in unsupervised database
-manual_fraction=0.95;  %%Fraction of samples that come from manual annotations
+manual_fraction=0.00;  %%Fraction of samples that come from manual annotations
 include_airguns=true;  %%If true include spectrograms of likely airgun signals
 
-year_want={'10','14'};
+year_want={'10','14'};%Note, must be in numerical order
 Site={'3','5'};
 DASAR_strings={'A','D','G'};
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
@@ -28,8 +28,8 @@ folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
 %       file_fraction.manual_all=zeros(Iyear,Isite,Iday,Idasar,I_d_directory);  %Last index is maximum number of 'D' folders expected.
 %     
 
-for I=1:length(data.max_DASAR_strings)
-    data.DASAR_strings{I}=data.max_DASAR_strings(I);
+for I=1:length(data.DASAR_strings)
+    data.DASAR_strings_cell{I}=data.DASAR_strings(I);
 end
 folder_fractions=[1-manual_fraction manual_fraction];
 
@@ -37,7 +37,7 @@ folder_fractions=[1-manual_fraction manual_fraction];
 Isite=contains(data.Site,Site);
 Iyear=contains(data.year_want,year_want);
 %Iday=contains(data.day_want,day_want);
-Idasar=contains(data.DASAR_strings,DASAR_strings);
+Idasar=contains(data.DASAR_strings_cell,DASAR_strings);
 
 data_sub.index=data.index(Iyear,Isite,:,:,:);
 data_sub.file_fraction.manual=data.file_fraction.manual_all(Iyear,Isite,:,Idasar,:);
@@ -58,6 +58,8 @@ data_sub.file_fraction.manual=data_sub.file_fraction.manual/sum(data_sub.file_fr
 file_name_list=[];file_name_flag=true;
 is_airgun_list=false(1,Nsamples);
 Icount=1;
+
+Nsamples_running_count=0;
 for Iyear=1:length(year_want)
     disp(year_want{Iyear});
     for Isite=1:length(Site)
@@ -75,6 +77,9 @@ for Iyear=1:length(year_want)
         for Iday=1:length(day_want)
             disp(day_want{Iday});
             for Ifold=1:length(folder_names)
+                if folder_fractions(Ifold)==0
+                    continue
+                end
                 disp(folder_names{Ifold});
                 dir_string=sprintf('%s/20%s/Site%s/Day_20%s%sT000000/%s', ...
                     database_folder,year_want{Iyear},Site{Isite},year_want{Iyear},day_want{Iday},folder_names{Ifold});
@@ -87,10 +92,11 @@ for Iyear=1:length(year_want)
                 %%%%How many samples are wanted from each folder
                 %  row is DASAR, column is 'D*.dir' folder
                 Nsamples_want=floor(folder_fractions(Ifold)*Nsamples*squeeze(file_fraction(Iyear,Isite,Iday,:,:)));
-
+                Nsamples_running_count=Nsamples_running_count+sum(Nsamples_want(:));
                 Ndd=size(Nsamples_want,2);
-                for Idd=1:Ndd
+                for Idd=1:Ndd  %%subfolders
                     if sum(Nsamples_want(:,Idd))==0  %if this D*.dir directory does not exist, exit.
+                        %disp("directory does not exist")
                         continue
                     end
 
@@ -103,13 +109,14 @@ for Iyear=1:length(year_want)
                     %%%Remove airgun signals if desired
                     if ~include_airguns
                         fnames=fnames(data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun<1,:);  %A value <1 is not an airgun (ICI is 0 or -1)
-                         airgun_index=airgun_index(data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun<1);
+                        airgun_index=airgun_index(data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun<1);
                     end
                     for Idasar=1:length(DASAR_strings)
                         disp(DASAR_strings{Idasar});
                         Igood=find(fnames(:,5)==DASAR_strings{Idasar});
                         Nfiles_local=length(Igood);
                         if Nfiles_local==0
+                            %disp('No DASAR here')
                             continue
                         end
                         %Two situations can occur.  First, the number
@@ -133,7 +140,11 @@ for Iyear=1:length(year_want)
 
                        %%%Copy specific files to destination folder
                         for Ifile=1:length(Ichoose)
-                            eval(sprintf('!cp %s/D%i.dir/%s %s/Unsupervised_database.dir',dir_string,Idd,fnames(Ichoose(Ifile),:),database_folder));
+                            copy_file_str=sprintf('%s/D%i.dir/%s',dir_string,Idd,fnames(Ichoose(Ifile),:));
+                            if exist(copy_file_str,'file')==0
+                                keyboard
+                            end
+                            eval(sprintf('!cp %s %s/Unsupervised_database.dir',copy_file_str,database_folder));
                             file_name_list(Icount,:)=fnames(Ichoose(Ifile),:);
                             is_airgun_list(Icount)=airgun_index(Ichoose(Ifile));
                             Icount=Icount+1;
@@ -153,7 +164,6 @@ if Icount<Nsamples
 
 end
 
-save([database_folder filesep 'airgun_index.mat'],'file_name_list','is_airgun_list');
 
 %%%Check results
 fnames_final=dir([database_folder '/Unsupervised_database.dir/*mat']);
@@ -161,6 +171,8 @@ fprintf('There are %i files in database\n',length(fnames_final));
 if length(is_airgun_list)~=length(fnames_final)
     keyboard
 end
+
+save([database_folder filesep 'Unsupervised_database.dir' filesep 'airgun_index.mat'],'file_name_list','is_airgun_list');
 
 
 letters=zeros(size(fnames_final,1),1);

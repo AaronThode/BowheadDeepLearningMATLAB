@@ -13,7 +13,7 @@
 %
 %   Variable formats and organization:
 %       index{Iyear,Isite,Iday,Ifold,I_d_directory};  Note that results NOT
-%               brokend down by DASAR
+%               broken down by DASAR
 %       file_fraction.manual_all=zeros(Iyear,Isite,Iday,Idasar,I_d_directory);  %Last index is maximum number of 'D' folders expected.
 %       file_fraction.auto_all= file counts including possible airguns
 %       file_fraction.auto_noairgun= file counts after possible airgun
@@ -32,8 +32,8 @@ eval(sprintf('!mkdir %s/Trash.dir',database_folder));
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
 
-year_want={'14','10'};
-Site={'5'};
+year_want={'10','14'};
+Site={'3','5'};
 
 DASAR_strings='ABCDEFG';
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
@@ -51,6 +51,7 @@ param.interval_remove.tol_feature=15;
 param.interval_remove.ICI_std=0.4;  %How close do adjacent ICI estimates have to be (sec)
 param.interval_remove.Nstd=7;      % How many ICIs must pass the 'ICI_std' test?
 
+test_file='S314A0T20140818T064828_Type0.mat';
 
 DASARs_counted=false;
 max_D_dirs=0;
@@ -102,7 +103,9 @@ for Iyear=1:length(year_want)
 
                     for Ifile=1:Nfiles
                         temp=load([fnames(Ifile).folder filesep fnames(Ifile).name]);
-
+                       % if contains(fnames(Ifile).name,test_file)
+                        %    keyboard
+                       % end
                         %%%Check that spectrogram sizes are consistent...if
                         %%%not, move to a Trash folder for investigation.
                         if ~all(SNR_gram_dims==size(temp.SNR_gram))
@@ -134,7 +137,7 @@ for Iyear=1:length(year_want)
                     %%%%Initialize file_fraction variables once
                     if ~DASARs_counted
                         DASARs_counted=true;
-                        file_fraction.manual_all=zeros(length(year_want),length(Site),length(day_want),length(DASAR_ID),3);  %Last index is maximum number of 'D' folders expected.
+                        file_fraction.manual_all=zeros(length(year_want),length(Site),length(day_want),length(DASAR_strings),3);  %Last index is maximum number of 'D' folders expected.
                         file_fraction.auto_all=file_fraction.manual_all;
                         file_fraction.auto_noairgun=file_fraction.manual_all;
                     end
@@ -143,12 +146,13 @@ for Iyear=1:length(year_want)
                     %folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
                     for Idasar=1:length(DASAR_ID)
                         Nfiles_DASAR=sum(double(DASAR_ID(Idasar))==index{Iyear,Isite,Iday,Ifold,Idd}.fname(:,5));
+                        Idasar_index=find(DASAR_ID(Idasar)==DASAR_strings);
                         if Ifold==1  %auto
-                            file_fraction.auto_all(Iyear,Isite,Iday,Idasar,Idd)=Nfiles_DASAR;
+                            file_fraction.auto_all(Iyear,Isite,Iday,Idasar_index,Idd)=Nfiles_DASAR;
                         else  %manual calls
-                            file_fraction.manual_all(Iyear,Isite,Iday,Idasar,Idd)=Nfiles_DASAR;
+                            file_fraction.manual_all(Iyear,Isite,Iday,Idasar_index,Idd)=Nfiles_DASAR;
                         end
-                    end
+                    end %Idasar
 
                     if Ifold==2  %%If a certified bowhead call from a manual annotation, skip airgun analysis.
                         continue
@@ -164,7 +168,8 @@ for Iyear=1:length(year_want)
                         ICI=estimate_airgun_interval(index{Iyear,Isite,Iday,Ifold,Idd}.tabs(Iltr),index{Iyear,Isite,Iday,Ifold,Idd}.bearing(Iltr),param.interval_remove);
                         index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun(Iltr)=ICI;
                         Nfiles_DASAR=sum(ICI<1);  %Count files not flagged as possible airgun
-                        file_fraction.auto_noairgun(Iyear,Isite,Iday,Idasar,Idd)=Nfiles_DASAR;
+                        Idasar_index=find(DASAR_ID(Idasar)==DASAR_strings);
+                        file_fraction.auto_noairgun(Iyear,Isite,Iday,Idasar_index,Idd)=Nfiles_DASAR;
                     end %Idasar
                     disp('Finished airgun detection');toc
                 end %Idd
@@ -177,4 +182,4 @@ end %Iyear
 %file_fraction.manual_all=file_fraction.manual_all/sum(file_fraction.manual_all(:));
 %file_fraction.auto_noairgun=file_fraction.auto_noairgun/sum(file_fraction.auto_noairgun(:));
 max_DASAR_strings=max_DASAR_strings.';
-save([database_folder '/Database_index.mat'],'index','file_fraction','year_want','Site','day_want','folder_names','SNR_gram_dims','max_DASAR_strings');
+save([database_folder '/Database_index.mat'],'index','file_fraction','year_want','Site','day_want','folder_names','SNR_gram_dims','DASAR_strings','max_DASAR_strings');
