@@ -55,7 +55,9 @@ data_sub.file_fraction.manual=data_sub.file_fraction.manual/sum(data_sub.file_fr
 
 %%%%%%%Enter each database folder and copy subset of files to Unsupervised
 %%%%%%%folder.
-
+file_name_list=[];file_name_flag=true;
+is_airgun_list=false(1,Nsamples);
+Icount=1;
 for Iyear=1:length(year_want)
     disp(year_want{Iyear});
     for Isite=1:length(Site)
@@ -93,10 +95,15 @@ for Iyear=1:length(year_want)
                     end
 
                     fnames=data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.fname;
-
+                    if file_name_flag
+                        file_name_list=zeros(Nsamples,size(fnames,2));
+                        file_name_flag=false;
+                    end
+                    airgun_index=data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun;
                     %%%Remove airgun signals if desired
                     if ~include_airguns
                         fnames=fnames(data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun<1,:);  %A value <1 is not an airgun (ICI is 0 or -1)
+                         airgun_index=airgun_index(data_sub.index{Iyear,Isite,Iday,Ifold,Idd}.is_airgun<1);
                     end
                     for Idasar=1:length(DASAR_strings)
                         disp(DASAR_strings{Idasar});
@@ -127,18 +134,35 @@ for Iyear=1:length(year_want)
                        %%%Copy specific files to destination folder
                         for Ifile=1:length(Ichoose)
                             eval(sprintf('!cp %s/D%i.dir/%s %s/Unsupervised_database.dir',dir_string,Idd,fnames(Ichoose(Ifile),:),database_folder));
+                            file_name_list(Icount,:)=fnames(Ichoose(Ifile),:);
+                            is_airgun_list(Icount)=airgun_index(Ichoose(Ifile));
+                            Icount=Icount+1;
                         end
                     end
                   
                 end %Idd
-            end
-        end
-    end
+            end %Ifold
+        end %Iday
+    end %Isite
+end %Iyear
+Icount=Icount-1;
+%%%Save airgun information
+if Icount<Nsamples
+    file_name_list=file_name_list(1:Icount,:);
+    is_airgun_list=is_airgun_list(1:Icount);
+
 end
+
+save([database_folder filesep 'airgun_index.mat'],'file_name_list','is_airgun_list');
 
 %%%Check results
 fnames_final=dir([database_folder '/Unsupervised_database.dir/*mat']);
 fprintf('There are %i files in database\n',length(fnames_final));
+if length(is_airgun_list)~=length(fnames_final)
+    keyboard
+end
+
+
 letters=zeros(size(fnames_final,1),1);
 for I=1:size(fnames_final,1)
      letters(I)=str2num(fnames_final(I).name(end-4));
