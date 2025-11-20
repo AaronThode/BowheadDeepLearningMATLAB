@@ -1,3 +1,0 @@
-# Track large binary model artifacts with Git LFS
-*.pth filter=lfs diff=lfs merge=lfs -text
-*.pt  filter=lfs diff=lfs merge=lfs -text
