@@ -5,7 +5,11 @@ Loads existing reconstruction_data.mat and regenerates the figure.
 
 USAGE:
     python replot_reconstructions.py <results_dir>
+    python replot_reconstructions.py /Autoencoder_v04_32LD_Balanced_Date20251117-185303.dir
+    python replot_reconstructions.py /Autoencoder_v04_32LD_HighAirguns_Date20251118-114536.dir
     python replot_reconstructions.py /Autoencoder_v04_32LD_MostlyManual_Date20251118-085305.dir
+
+
 """
 import numpy as np
 import matplotlib
@@ -83,7 +87,7 @@ def replot_reconstructions(results_dir, show_error=False):
     minor_ticks = minor_tick_values / time_step
     
     # Create figure
-    fig, axes = plt.subplots(n_rows, cols, figsize=(15, 6 if n_rows == 2 else 9))
+    fig, axes = plt.subplots(n_rows, cols, figsize=(10, 6 if n_rows == 2 else 9))
     if cols == 1:
         axes = np.expand_dims(axes, axis=1)
     
@@ -96,23 +100,27 @@ def replot_reconstructions(results_dir, show_error=False):
             axes[0, i].set_yticks(freq_ticks)
             axes[0, i].set_yticklabels(freq_labels)
             axes[0, i].set_ylabel('Frequency (Hz)', fontsize=10)
-            axes[0, i].set_xticks(time_ticks)
-            axes[0, i].set_xticklabels(time_labels)
+            axes[0, i].set_xticks(major_ticks)
+            axes[0, i].set_xticklabels(major_labels)
+            axes[0, i].set_xticks(minor_ticks, minor=True)
             axes[0, i].set_xlabel('Time (s)', fontsize=10)
+            axes[0, i].tick_params(axis='x', which='minor', length=3)
         else:
             axes[0, i].axis('off')
         
         # Reconstruction row
         axes[1, i].imshow(recon_np[i], cmap='viridis', origin='lower', aspect='auto', 
                          vmin=vmin_data, vmax=vmax_data)
-        axes[1, i].set_title('Reconstruction')
+        axes[1, i].set_title(f'Recon {i+1}')
         if i == 0:  # Only show axes on first column
             axes[1, i].set_yticks(freq_ticks)
             axes[1, i].set_yticklabels(freq_labels)
             axes[1, i].set_ylabel('Frequency (Hz)', fontsize=10)
-            axes[1, i].set_xticks(time_ticks)
-            axes[1, i].set_xticklabels(time_labels)
+            axes[1, i].set_xticks(major_ticks)
+            axes[1, i].set_xticklabels(major_labels)
+            axes[1, i].set_xticks(minor_ticks, minor=True)
             axes[1, i].set_xlabel('Time (s)', fontsize=10)
+            axes[1, i].tick_params(axis='x', which='minor', length=3)
         else:
             axes[1, i].axis('off')
         
@@ -120,29 +128,29 @@ def replot_reconstructions(results_dir, show_error=False):
         if show_error:
             diff = np.abs(data_np[i] - recon_np[i])
             axes[2, i].imshow(diff, cmap='hot', origin='lower', aspect='auto')
-            axes[2, i].set_title('Error')
+            axes[2, i].set_title(f'Error {i+1}')
             if i == 0:  # Only show axes on first column
                 axes[2, i].set_yticks(freq_ticks)
                 axes[2, i].set_yticklabels(freq_labels)
                 axes[2, i].set_ylabel('Frequency (Hz)', fontsize=10)
-                axes[2, i].set_xticks(time_ticks)
-                axes[2, i].set_xticklabels(time_labels)
+                axes[2, i].set_xticks(major_ticks)
+                axes[2, i].set_xticklabels(major_labels)
+                axes[2, i].set_xticks(minor_ticks, minor=True)
                 axes[2, i].set_xlabel('Time (s)', fontsize=10)
+                axes[2, i].tick_params(axis='x', which='minor', length=3)
             else:
                 axes[2, i].axis('off')
     
-    # Add title with training parameters
-    if epochs and latent_dim and channels:
-        plt.suptitle(f'Autoencoder Reconstructions (epochs={epochs}, latent_dim={latent_dim}, channels={channels})', fontsize=12)
-    else:
-        plt.suptitle('Autoencoder Reconstructions (with Frequency/Time Axes)', fontsize=12)
+    # Add title above center columns (around Input 5-6 position)
+    title_text = f'Autoencoder Reconstructions (epochs={epochs}, latent_dim={latent_dim}, channels={channels})' if (epochs and latent_dim and channels) else 'Autoencoder Reconstructions'
+    plt.figtext(0.5, 0.98, title_text, ha='center', va='top', fontsize=12, fontweight='bold')
     
     # Add dataset label in bottom right corner
     if dataset_label:
         plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', 
                    ha='right', va='bottom', fontsize=7, style='italic', alpha=0.6)
     
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     
     # Save with new name
     output_path = os.path.join(results_dir, 'reconstructions_with_axes.png')

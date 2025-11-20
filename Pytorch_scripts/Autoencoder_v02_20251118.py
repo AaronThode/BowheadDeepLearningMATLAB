@@ -684,17 +684,23 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     
     # ALWAYS save latent embeddings (even if t-SNE failed)
     print(f"Saving latent embeddings ({imp_z.shape[0]} samples, {imp_z.shape[1]}-dim)...")
+    
+    # Extract filenames from dataset (only basenames, matching embedding order)
+    filenames = np.array([os.path.basename(dataset.file_paths[i]) for i in range(tsne_sample_count)], dtype=object)
+    
     latent_data = {
         'latent_embeddings': imp_z,
         'tsne_embeddings': emb,
         'clusters': clusters,
         'optimal_k': optimal_k,
         'perplexity': perplexity,
-        'dataset_label': dataset_label
+        'dataset_label': dataset_label,
+        'filenames': filenames
     }
     embeddings_path = os.path.join(output_dir, 'latent_embeddings.mat')
     savemat(embeddings_path, latent_data)
     print(f"Saved latent embeddings to: {embeddings_path}")
+    print(f"  -> Includes 'filenames' field mapping {len(filenames)} embeddings to source files")
     print("  -> Use replot_tsne_from_saved.py to re-plot with different k values!")
     
     # STEP 7: Save JPEG reconstruction panels
