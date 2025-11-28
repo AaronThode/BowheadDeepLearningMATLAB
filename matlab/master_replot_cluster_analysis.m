@@ -1,12 +1,15 @@
 %%%%%%%master_cluster_analysis.m%%%%
 % Nov 25, 2025
 
-%close all
+close all
 clear all
 
 same_grid_size=true;
 cluster_dir='../../Cluster_Analysis';
-data_dir=[cluster_dir filesep 'Autoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008'];
+run_str='Autoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008';
+data_dir=[cluster_dir filesep run_str];
+images_dir='../../Spectrogram_Image_Database.dir/Unsupervised_database_MostlyManual.dir';
+
 %data_dir='Autoencoder_v07_100E_32LD_AutoWithAirguns_50K_Date20251123-001830';
 %data=load([data_dir '.dir' filesep 'latent_embeddings.mat']);
 %param.perplexity=[10 30 50 10 30 50];
@@ -23,9 +26,9 @@ SNR_data=load([data_dir '.dir' filesep 'airgun_index.mat']);
 I_snr=find(SNR_data.SNR>=param.min_SNR);
 
 Icount=0;
-for II=1:2
+for II=2:-1:1
     Icount=Icount+1;
-    load(sprintf('%s%sAutoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008_v%i.mat',cluster_dir,filesep,II));
+    load(sprintf('%s%s%s_v%i.mat',cluster_dir,filesep,run_str,II));
 
     % ID=zeros(1,length(data.filenames));
     % for I=1:length(data.filenames)
@@ -40,14 +43,14 @@ for II=1:2
     Itype_str{3}=temp;
     %for J=1:length(param.perplexity)
     
-    for J=1:6
+    for J=5:5
         
         tt{J}=tt{J}(I_snr,:);
-        % figure(J);set(gcf,'Position',[42         190        1830         761]);
-        %histogram2(tt{J}(:,1),tt{J}(:,2),'DisplayStyle','tile');colorbar;grid on
-        %title(sprintf('Perplexity: %i Standardize: %i',param.perplexity(J),param.standardize(J)));
+        figure(10*II+J);set(gcf,'Position',[42         190        1830         761]);
+        histogram2(tt{J}(:,1),tt{J}(:,2),x_grid,y_grid,'DisplayStyle','tile');colorbar;grid on
+        title(sprintf('Perplexity: %i Standardize: %i',param.perplexity(J),param.standardize(J)));
 
-        %saveas(gcf,sprintf('%s_all_%i.fig',data_dir,J))
+        saveas(gcf,sprintf('%s_all_%i.fig',data_dir,J))
 
 
         figure;set(gcf,'Position',[42         190        1830         761]);
@@ -111,15 +114,54 @@ for II=1:2
             'Fontsize',18);
         xlim(xlimm_all);ylim(ylimm_all)
 
-    end %J
+    end %J-param combination trial
 
     %figure
     %histogram(ID);grid on
 
     %save([data_dir '.mat'],'tt','param','Itype_str','ID');
 
+end %II run number
+
+
+
+%%%Optional review of clusters
+yes=input('Type 1 if want to analyze clusters: ');
+if ~isempty(yes)
+    tmp=ginput(2);
+    Icluster=find(tt{J}(:,1)>=min(tmp(:,1)) & tt{J}(:,1)<=max(tmp(:,1))  ...
+              & tt{J}(:,2)>=min(tmp(:,2))  & tt{J}(:,2)<=max(tmp(:,2)) ...
+               );
+              % & ID'==7);
+    figure;scatter(tt{J}(Icluster,1),tt{J}(Icluster,2))
+
+    temp_fnames=load(sprintf('%s%s%s.dir/latent_embeddings.mat',cluster_dir,filesep,run_str),'filenames');
+    temp_fnames=temp_fnames.filenames;
+    temp_fnames=temp_fnames(Icluster);
+
+    Ncalls=30;
+    Iwant=(randperm(length(Icluster),Ncalls));
+    figure;set(gcf,'Position',[ 11          60        1745         874  ]);
+    for JJ=1:Ncalls
+        subplot(3,10,JJ)
+        disp(temp_fnames{Iwant(JJ)})
+        data=load(sprintf('%s%s%s',images_dir,filesep,temp_fnames{Iwant(JJ)}));
+        FF=data.dF*(0:size(data.SNR_gram,1));
+        TT=data.dT*(0:size(data.SNR_gram,2));
+
+        imagesc(TT,FF,data.SNR_gram);%colorbar;
+        axis xy
+        title(sprintf('%s,%s',temp_fnames{Iwant(JJ)}(1:22),temp_fnames{Iwant(JJ)}(end-4)),'FontSize',10);
+        if rem(JJ,10)~=1
+            set(gca,'ytick',[])
+        end
+        if JJ<20
+            set(gca,'xtick',[])
+        end
+    end
 end
 
+%%%Distribution of call types in database
 figure
 histogram(ID)
 xtick_label=get(gca,'XTickLabel');

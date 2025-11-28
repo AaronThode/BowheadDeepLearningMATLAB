@@ -4,14 +4,13 @@
 close all
 clear all
 
-data_dir='Autoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008';
-%data_dir='Autoencoder_v07_100E_32LD_AutoWithAirguns_50K_Date20251123-001830';
+data_dir='../../Cluster_Analysis/Autoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008';
+data_dir='../../Cluster_Analysis/Autoencoder_v07_100E_32LD_AutoWithAirguns_50K_Date20251123-001830';
 param.perplexity=[10 30 50 10 30 50];
 param.standardize=[false false false true true true];
 
-%param.perplexity=[ 30 ];
-%param.standardize=[true ];
-%param.min_SNR=120;
+param.perplexity=[ 30 ];
+param.standardize=[true ];
 
 
 Itype_str={'Upcall','Downcall','Constant','U-shaped','N-shaped','Other FM','Complex','Bearded Seal','Walrus'};
