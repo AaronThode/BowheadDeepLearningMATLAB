@@ -9,8 +9,9 @@ cluster_dir='../../Cluster_Analysis';
 run_str='Autoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008';
 images_dir='../../Spectrogram_Image_Database.dir/Unsupervised_database_MostlyManual.dir';
 
-%run_str='Autoencoder_v07_100E_32LD_AutoWithAirguns_50K_Date20251123-001830';
-%images_dir='../../Spectrogram_Image_Database.dir/Unsupervised_database_AutoWithAirguns.dir';
+run_str='Autoencoder_v07_100E_32LD_AutoWithAirguns_50K_Date20251123-001830';
+images_dir='../../Spectrogram_Image_Database.dir/Unsupervised_database_AutoWithAirguns.dir';
+%images_dir='/Volumes/Maui2025/DeepLearningBowhead/Spectrogram_Image_Database.dir/Unsupervised_database_AutoWithAirguns.dir';
 data_dir=[cluster_dir filesep run_str];
 
 %data_dir='Autoencoder_v07_100E_32LD_AutoWithAirguns_50K_Date20251123-001830';
@@ -22,7 +23,7 @@ data_dir=[cluster_dir filesep run_str];
 
 
 param_here.min_SNR=5*1;
-param_here.alpha=1;
+param_here.alpha=0.5;
 x_grid=-60:5:60;
 y_grid=x_grid;
 
@@ -30,7 +31,8 @@ SNR_data=load([data_dir '.dir' filesep 'airgun_index.mat']);
 I_snr=find(SNR_data.SNR>=param_here.min_SNR);
 
 Icount=0;
-for II=2:-1:1
+%for II=2:-1:1
+for II=1:1
     Icount=Icount+1;
     load(sprintf('%s%s%s_v%i.mat',cluster_dir,filesep,run_str,II));
 
@@ -47,8 +49,8 @@ for II=2:-1:1
     Itype_str{3}=temp;
     %for J=1:length(param.perplexity)
     
-    for J=5:5
-        
+   % for J=5:5
+     for J=1:1   
         tt{J}=tt{J}(I_snr,:);
         figure(10*II+J);set(gcf,'Position',[42         190        1830         761]);
         histogram2(tt{J}(:,1),tt{J}(:,2),x_grid,y_grid,'DisplayStyle','tile');colorbar;grid on
@@ -166,7 +168,7 @@ if ~isempty(yes)
 end
 
 %%%Distribution of call types in database
-figure
+figure;set(gcf,'Position',[ 8         286        1195         650]);
 histogram(ID)
 xtick_label=get(gca,'XTickLabel');
 for I=1:length(xtick_label)
@@ -175,3 +177,7 @@ end
 xtick_label{2}='Downcall';
 xtick_label{3}='Constant';
 set(gca,'XTickLabel',xtick_label)
+ylabel('Samples');
+set(gca,'FontWeight','bold','FontSize',14);
+grid on
+
