@@ -6,7 +6,7 @@
 %  space (usually with a multiplicative factor to allow a resolution of 0.1
 %  dB
 %
-%  It will also estimate the bearing of the signal if the 'GSI' file type
+%  It will also estimate the bearing, NTV, and KE of the signal if the 'GSI' file type
 %  is chosen.
 %
 %  The script first uploads manual annotation logs and downloads all
@@ -35,7 +35,7 @@ if contains(hostname,'macmussel-2')
 else
     GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
     GSI_file_dir='/Volumes/Shared/Data/';
-    code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software';
+    code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software/matlab';
     WAV_file_dir='/Volumes/Bowhead4/';
     Manual_record_files_dir='../../Shell_Manual_Results';
 
@@ -53,7 +53,7 @@ file_len_sec=5; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=3; %length of final spectrogram clip. (data used for noise removed)
 param.event.fmin = 25; %Hz
 param.event.fmax = 500; %Hz
-sound_type='whale'; %whale or seal: for filtering manual results
+sound_type='whale'; %whale or seal or 'all_biologics': for filtering manual results
 DASAR_strings='ADG';  %%What DASARs to sample data from.  Can be non-contiguous order: 'ACG';
 
 %Event detector fundamental parameters
@@ -80,10 +80,16 @@ chunk_sample=6*60*60-1;  %%%% Seconds of data to process to spectrogram to conse
 
 %%%Parameters that rarely need to be changed at this point.
 
+% scaling factors when converting images to uint8
 param.event.image_scale_factor = 5;  % factor to multiply SNR by for saving as unit8 image
+param.spec.NTV=100;
+param.spec.KE_offset=20;
+param.spec.KE_scale=6;
+param.spec.Polar=1;
+param.spec.image_scale_factor = param.event.image_scale_factor;
+
 param.spec.Nfft=256;
 param.spec.ovlap=0.9;
-param.spec.image_scale_factor = param.event.image_scale_factor;
 param.spec.fmin = param.event.fmin;
 param.spec.fmax = param.event.fmax;
 %param.spec.final_dims=8*[16 10];
@@ -156,6 +162,8 @@ for Iyear=1:length(year_want)
             Itype=find(manual.localized.wctype<=7);  %bowhead whale calls only
         elseif strcmpi(sound_type,'seal')
             Itype=find(manual.localized.wctype==8 | manual.localized.wctype==9);  %seal and walrus only
+        elseif strcmpi(sound_type,'all_biologics')
+            Itype=find(manual.localized.wctype>=1 & manual.localized.wctype<=9);  %seal and walrus only
 
         end
 
@@ -353,7 +361,7 @@ for Iyear=1:length(year_want)
 %                     else
 %                         param.spec.debug_plot=false;
 %                     end
-                    [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                    [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                     if isempty(SNR_gram)
                         disp('SNR_gram is empty')
                         continue
@@ -386,7 +394,9 @@ for Iyear=1:length(year_want)
                         end
                         current_file_count=current_file_count+1;
                         dF=FF(2)-FF(1);dT=TT(2)-TT(1);
-                        save(output_name,'SNR_gram','dF','dT','bearing','tabs_mid');
+                        NTV_gram=VS_metrics{2};KEtoPE_gram=VS_metrics{3};Polar_gram=VS_metrics{4};
+                        save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram','dF','dT','bearing','tabs_mid');
+
                         %database{Iyear,Isite,Id}.tabs=[]
 
                     end
@@ -473,7 +483,7 @@ for Iyear=1:length(year_want)
                         else
                             param.spec.debug_plot=false;
                         end
-                        [SNR_gram,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                        [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                         if isempty(SNR_gram)
                             continue
                         end
@@ -500,7 +510,8 @@ for Iyear=1:length(year_want)
                             end
                             current_file_count=current_file_count+1;
                             dF=FF(2)-FF(1);dT=TT(2)-TT(1);
-                            save(output_name,'SNR_gram','dF','dT','bearing','tabs_mid');
+                            NTV_gram=VS_metrics{2};KEtoPE_gram=VS_metrics{3};Polar_gram=VS_metrics{4};
+                            save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram','dF','dT','bearing','tabs_mid');
 
                         end
                     end %Idet

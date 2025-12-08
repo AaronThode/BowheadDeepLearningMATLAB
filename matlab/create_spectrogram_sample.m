@@ -1,5 +1,5 @@
-function [SNR_gram,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
-%[SNR_gram,FF,TT]=create_snippet(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr)
+function [SNR_gram,output_array_fin,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
+%function [SNR_gram,output_array_fin,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
 
 SNR_gram=[];TT=[];FF=[];azi=[];
 tsec_start=tmid-0.5*file_len_sec;
@@ -14,7 +14,8 @@ if length(y)~=Fs*file_len_sec
     return
 end
 
-[SNR_gram,FF,TT,azi]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
+%[SNR,output_array_fin,F,T,median_raw]
+[SNR_gram,output_array_fin,FF,TT,azi]=create_normalized_spectrogram(double(y),Fs,spectrogram_len_sec,param);
 
 %%Ensure image dimensions are divisible by 8 to allow it to be close to
 %%NUWC 128 by 144 image
@@ -31,7 +32,11 @@ else
     Iff=(nrow_cut+1):(length(FF)-nrow_cut);
 end
 
-SNR_gram=SNR_gram(Iff,Itt);TT=TT(Itt);FF=FF(Iff);
+SNR_gram=SNR_gram(Iff,Itt);
+for III=1:length(output_array_fin)
+    output_array_fin{III}=output_array_fin{III}(Iff,Itt);
+end
+TT=TT(Itt);FF=FF(Iff);
 
 %if ~isfield(param,'debug_max_tmid')
 %    param.debug_max_tmid=Inf;
