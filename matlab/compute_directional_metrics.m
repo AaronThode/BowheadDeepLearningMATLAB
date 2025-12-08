@@ -152,7 +152,7 @@ else  %%All other data is coming on on other channels.
         B=zeros(Nchan,Nfft/2+1,M);
 
         for J=1:Nchan
-            fprintf('Spectrogram channel %i\n',J);
+            %fprintf('Spectrogram channel %i\n',J);
             [B(J,:,:),FF,TT] = spectrogram(x(:,J),Nfft,round(ovlap*Nfft),Nfft,Fs);
         end
         Nf=Nfft/2+1;  %Should be the same as length(FF)
