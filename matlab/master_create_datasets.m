@@ -63,7 +63,7 @@ param.energy.eq_time = 23.8;  %%Original choice
 year_want={'08','09','10','11','12','13','14'};  %What years to process
 Site={'2','3','4','5'};  %What sites to process
 
-year_want={'10'};
+year_want={'08','10','12','14'};
 Site={'5'};
 
 
