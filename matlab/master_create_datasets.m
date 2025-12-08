@@ -22,7 +22,7 @@ clear
 addpath .
 warning off
 !rm diary_output.txt
-diary diary_output.txt
+%diary diary_output.txt
 
 %%%Computer specific information
 [~,hostname]=system('hostname');

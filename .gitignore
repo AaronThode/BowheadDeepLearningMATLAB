@@ -22,5 +22,5 @@ Pytorch_scripts/Spectrogram_Image_Database.dir/
 *.asv
 *.mat
 *.jpg
-*.txt
 *.png
+diary_output.txt
