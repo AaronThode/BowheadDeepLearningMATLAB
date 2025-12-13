@@ -5,10 +5,9 @@ Loads existing reconstruction_data.mat and regenerates the figure.
 
 USAGE:
     python replot_reconstructions.py <results_dir>
-    python replot_reconstructions.py /Autoencoder_v04_32LD_Balanced_Date20251117-185303.dir
-    python replot_reconstructions.py /Autoencoder_v04_32LD_HighAirguns_Date20251118-114536.dir
-    python replot_reconstructions.py /Autoencoder_v04_32LD_MostlyManual_Date20251118-085305.dir
-
+    python replot_reconstructions.py ../results/Autoencoder_v04_32LD_Balanced_Date20251117-185303.dir
+    python replot_reconstructions.py ../results/Autoencoder_v04_32LD_HighAirguns_Date20251118-114536.dir
+python replot_reconstructions.py ../results/Autoencoder_v04_32LD_MostlyManual_Date20251118-085305.dir
 
 """
 import numpy as np
@@ -63,11 +62,12 @@ def replot_reconstructions(results_dir, show_error=False):
     
     nrow, ncol = data_np.shape[1], data_np.shape[2]
     
-    # Frequency axis parameters: 121 rows, start=27.3438 Hz, step=3.9062 Hz, max=500 Hz
-    freq_start = 10
-    freq_step = 5
+    # Frequency axis parameters: 121 rows, min=25 Hz, max=500 Hz
+    freq_min = 25
+    freq_max = 500
+    freq_step = (freq_max - freq_min) / (nrow - 1)  # Calculate step based on data
     freq_ticks = np.arange(0, nrow, 30)  # Show tick every 30 rows
-    freq_labels = [f'{freq_start + tick * freq_step:.0f}' for tick in freq_ticks]
+    freq_labels = [f'{freq_min + tick * freq_step:.0f}' for tick in freq_ticks]
     
     # Time axis parameters: 104 columns, each 0.026 seconds, total=2.7 seconds
     time_step = 0.026

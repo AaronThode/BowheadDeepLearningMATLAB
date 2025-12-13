@@ -27,11 +27,12 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for faster plotting
 import matplotlib.pyplot as plt
 import os
+import sys
 import glob
 import math
 import torch.nn.functional as F
 from scipy.io import loadmat, savemat
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from datetime import datetime
 import time
 import gc  # For explicit garbage collection
@@ -50,7 +51,7 @@ import argparse
 # ============================================================================
 
 # Architecture parameters
-CHANNELS_DEFAULT = 64
+CHANNELS_DEFAULT = 32
 LATENT_DIM_DEFAULT = 32
 EXTRA_CONV_DEFAULT = False
 
@@ -63,7 +64,7 @@ SEED_DEFAULT = 42
 NUMBER_OUTPUT_IMAGE_SAMPLES = 30   # Reduced from 5000 for faster JPEG generation
 PANEL_GROUP_SIZE = 3
 SHOW_ERROR_PLOTS = False
-DEFAULT_VERSION_TAG = "05_100E_32LD_MostlyManual"
+DEFAULT_VERSION_TAG = "08_100E_32LD_CombinedDatasets_100K"
 TSNE_MAX_SAMPLES = None  # None => use all samples in dataset
 
 
@@ -97,6 +98,13 @@ def create_output_directory(version_tag: str | None = None) -> str:
     output_dir = os.path.join(results_dir, dir_name)
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
+
+
+def ensure_dir_exists(filepath: str):
+    """Ensure parent directory exists before writing file."""
+    dir_path = os.path.dirname(filepath)
+    if dir_path:
+        os.makedirs(dir_path, exist_ok=True)
 
 
 def _minmax_norm(im: np.ndarray, auto_skip_if_unit: bool = True) -> np.ndarray:
@@ -328,21 +336,32 @@ def select_samples_for_outputs(dataset: Dataset, n_samples: int, seed: int | Non
     indices = rng.choice(total, size=k, replace=False) if total > k else np.arange(total)
     samples = []
     filenames = []
+    
+    # Collect all file paths (handle both single dataset and ConcatDataset)
+    all_file_paths = []
+    if isinstance(dataset, ConcatDataset):
+        for ds in dataset.datasets:
+            if hasattr(ds, 'file_paths'):
+                all_file_paths.extend(ds.file_paths)
+    elif hasattr(dataset, 'file_paths'):
+        all_file_paths = dataset.file_paths
+    
     for idx in indices:
         sample, _ = dataset[int(idx)]
         samples.append(sample.unsqueeze(0))
-        if hasattr(dataset, 'file_paths'):
-            filenames.append(os.path.basename(dataset.file_paths[int(idx)]))
+        if all_file_paths and int(idx) < len(all_file_paths):
+            filenames.append(os.path.basename(all_file_paths[int(idx)]))
         else:
-            filenames.append("")
+            filenames.append(f"sample_{int(idx):06d}")
     return torch.cat(samples, dim=0).float(), filenames
 
 
 def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_dir: str,
                                target_hw: tuple[int, int], base_name: str = "recon_panel",
                                dataset_label: str = "", filenames: list[str] = None, 
-                               show_error: bool = SHOW_ERROR_PLOTS) -> int:
-    """Save JPEG panels showing reconstructions."""
+                               show_error: bool = SHOW_ERROR_PLOTS, epochs: int = 100,
+                               latent_dim: int = 32, channels: int = 64) -> int:
+    """Save JPEG panels showing reconstructions with proper axis labels."""
     if samples is None or samples.shape[0] == 0:
         return 0
     os.makedirs(output_dir, exist_ok=True)
@@ -350,6 +369,11 @@ def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_d
     group_count = math.ceil(num_samples / PANEL_GROUP_SIZE)
     panels_written = 0
     n_rows = 3 if show_error else 2
+    
+    # Spectrogram parameters for axis labels
+    nrow, ncol = target_hw  # 121 rows (freq bins), 104 cols (time bins)
+    freq_max_hz = 500.0  # Typical max frequency for whale calls
+    time_duration_sec = 3.0  # Duration in seconds
     
     for group_idx in range(group_count):
         start = group_idx * PANEL_GROUP_SIZE
@@ -362,34 +386,75 @@ def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_d
         recon_np = recon.squeeze(1).cpu().numpy()
         
         cols = recon_np.shape[0]
-        fig, axes = plt.subplots(n_rows, cols, figsize=(3 * cols, 3 * n_rows))
+        fig, axes = plt.subplots(n_rows, cols, figsize=(3.5 * cols, 3.5 * n_rows))
         if cols == 1:
             axes = np.expand_dims(axes, axis=1)
         
         for col in range(cols):
             sample_idx = start + col
+            
+            # Set filename as title
             if filenames and sample_idx < len(filenames) and filenames[sample_idx]:
                 title = filenames[sample_idx].replace('.mat', '')
-                if len(title) > 25:
-                    title = title[:22] + '...'
+                if len(title) > 30:
+                    title = title[:27] + '...'
             else:
                 title = f'Input {sample_idx + 1}'
             
-            axes[0, col].imshow(orig_np[col], cmap='viridis', origin='lower', aspect='auto')
-            axes[0, col].set_title(title, fontsize=6)
-            axes[0, col].axis('off')
-            axes[1, col].imshow(recon_np[col], cmap='viridis', origin='lower', aspect='auto')
-            axes[1, col].axis('off')
+            # Original spectrogram
+            im0 = axes[0, col].imshow(orig_np[col], cmap='viridis', origin='lower', aspect='auto',
+                                      extent=[0, time_duration_sec, 0, freq_max_hz])
+            axes[0, col].set_title(title, fontsize=7)
+            axes[0, col].set_ylabel('Frequency (Hz)', fontsize=6)
+            if col == 0:
+                axes[0, col].tick_params(axis='both', labelsize=5)
+            else:
+                axes[0, col].set_yticks([])
+            axes[0, col].set_xticks([])
+            
+            # Reconstruction
+            im1 = axes[1, col].imshow(recon_np[col], cmap='viridis', origin='lower', aspect='auto',
+                                      extent=[0, time_duration_sec, 0, freq_max_hz])
+            axes[1, col].set_ylabel('Frequency (Hz)', fontsize=6)
+            axes[1, col].set_xlabel('Time (s)', fontsize=6)
+            if col == 0:
+                axes[1, col].tick_params(axis='both', labelsize=5)
+            else:
+                axes[1, col].set_yticks([])
+            axes[1, col].tick_params(axis='x', labelsize=5)
             
             if show_error:
                 diff_np = np.abs(orig_np - recon_np)
-                axes[2, col].imshow(diff_np[col], cmap='hot', origin='lower', aspect='auto')
-                axes[2, col].axis('off')
+                im2 = axes[2, col].imshow(diff_np[col], cmap='hot', origin='lower', aspect='auto',
+                                         extent=[0, time_duration_sec, 0, freq_max_hz])
+                axes[2, col].set_ylabel('Frequency (Hz)', fontsize=6)
+                axes[2, col].set_xlabel('Time (s)', fontsize=6)
+                if col == 0:
+                    axes[2, col].tick_params(axis='both', labelsize=5)
+                else:
+                    axes[2, col].set_yticks([])
+                axes[2, col].tick_params(axis='x', labelsize=5)
         
+        # Add row labels on the left
+        fig.text(0.02, 0.75 if not show_error else 0.83, 'Input', rotation=90, 
+                va='center', ha='center', fontsize=8, weight='bold')
+        fig.text(0.02, 0.5 if not show_error else 0.5, 'Reconstruction', rotation=90,
+                va='center', ha='center', fontsize=8, weight='bold')
+        if show_error:
+            fig.text(0.02, 0.17, 'Error', rotation=90, va='center', ha='center', 
+                    fontsize=8, weight='bold')
+        
+        # Add title at top with model parameters
+        title_str = f'Autoencoder Reconstructions (epochs={epochs}, latent_dim={latent_dim}, channels={channels})'
+        fig.suptitle(title_str, fontsize=10, y=0.98)
+        
+        # Add dataset label at bottom right
         if dataset_label:
-            plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', ha='right', va='bottom', fontsize=8, style='italic', alpha=0.7)
+            fig.text(0.98, 0.01, f'{dataset_label}', ha='right', va='bottom', 
+                    fontsize=6, style='italic', alpha=0.6)
+        
         panel_path = os.path.join(output_dir, f"{base_name}_{group_idx + 1:03d}.jpg")
-        plt.tight_layout()
+        plt.tight_layout(rect=[0.03, 0.02, 1, 0.96])
         plt.savefig(panel_path, dpi=200, bbox_inches='tight')
         plt.close(fig)
         panels_written += 1
@@ -408,7 +473,6 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                                    version_tag: str = DEFAULT_VERSION_TAG, show_error: bool = SHOW_ERROR_PLOTS,
                                    k_clusters: int = 2, tsne_perplexity: float | None = None):
     """
-    Train autoencoder from scratch with guaranteed fresh start and optimal performance.
     
     FRESH START GUARANTEES:
     - New model initialized with random weights (controlled by seed)
@@ -426,6 +490,14 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     # Start timing
     script_start_time = time.time()
     
+    # STEP 0: Set device (GPU if available, else CPU)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA Version: {torch.version.cuda}")
+    sys.stdout.flush()
+    
     # STEP 1: Initialize random seed for reproducible FROM-SCRATCH initialization
     if seed is not None:
         set_global_seed(int(seed))
@@ -440,10 +512,27 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"Config: epochs={epochs}, lr={lr}, latent_dim={latent_dim}, channels={channels}")
     print(f"="*70)
     
-    # STEP 2: Load dataset
-    print(f"\nLoading data from: {data_dir}")
-    dataset_label = os.path.basename(data_dir.rstrip('/'))
-    dataset = SNRDataset(data_dir, normalize=True, seed=seed, show_summary=True)
+    # STEP 2: Load datasets from both directories
+    if isinstance(data_dir, str):
+        # Single directory (backward compatibility)
+        print(f"\nLoading data from: {data_dir}")
+        dataset_label = os.path.basename(data_dir.rstrip('/'))
+        dataset = SNRDataset(data_dir, normalize=True, seed=seed, show_summary=True)
+    elif isinstance(data_dir, (list, tuple)):
+        # Multiple directories - combine them
+        print(f"\nLoading data from {len(data_dir)} directories:")
+        datasets = []
+        for i, dir_path in enumerate(data_dir, 1):
+            print(f"  [{i}] {dir_path}")
+            ds = SNRDataset(dir_path, normalize=True, seed=seed, show_summary=True)
+            datasets.append(ds)
+            print(f"      Loaded {len(ds)} samples")
+        dataset = ConcatDataset(datasets)
+        dataset_label = f"Combined_{len(data_dir)}_datasets"
+        print(f"\nTotal combined samples: {len(dataset)}")
+    else:
+        raise ValueError(f"data_dir must be str or list/tuple, got {type(data_dir)}")
+    
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
     
     # Load visualization samples
@@ -462,11 +551,17 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"\nInitializing NEW model from random weights...")
     model = ImprovedAutoencoder(nrow=nrow, ncol=ncol, latent_dim=latent_dim, 
                                 base_channels=channels, extra_conv=extra_conv)
+    model = model.to(device)  # Move model to GPU
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     print(f"Architecture: {4 if extra_conv else 3} conv layers, latent_dim={latent_dim}")
+    print(f"Model on device: {next(model.parameters()).device}")
     
     # STEP 4: Train from scratch
     print(f"\nTraining model from scratch for {epochs} epochs...")
+    print(f"Output directory: {output_dir}")
+    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    sys.stdout.flush()  # Ensure output is written immediately
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
     model.train()
@@ -481,6 +576,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         batch_count = 0
         
         for batch_data, _ in train_loader:
+            batch_data = batch_data.to(device)  # Move batch to GPU
             optimizer.zero_grad()
             output, _ = model(batch_data)
             output = match_shape_center(output, (nrow, ncol))
@@ -500,16 +596,39 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
             o_max = float(output.max().cpu())
             o_mean = float(output.mean().cpu())
         
-        if epoch % 5 == 0 or epoch == epochs - 1:
-            print(f"  Epoch {epoch:3d}/{epochs}: Loss={avg_loss:.4f} | out[{o_min:.3f}, {o_max:.3f}] | {epoch_time:.1f}s")
+        # Print progress every epoch for monitoring
+        elapsed = time.time() - training_start_time
+        eta_seconds = (elapsed / (epoch + 1)) * (epochs - epoch - 1)
+        eta_minutes = eta_seconds / 60
+        print(f"  Epoch {epoch:3d}/{epochs}: Loss={avg_loss:.4f} | out[{o_min:.3f}, {o_max:.3f}] | {epoch_time:.1f}s | ETA: {eta_minutes:.1f}min")
+        sys.stdout.flush()  # Force write to log file
+        
+        # Save checkpoint every 10 epochs for recovery
+        if (epoch + 1) % 10 == 0:
+            checkpoint_path = os.path.join(output_dir, f'checkpoint_epoch{epoch+1}.pth')
+            os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': avg_loss,
+                'losses': losses,
+            }, checkpoint_path)
+            print(f"  >> Checkpoint saved: {checkpoint_path}")
+            sys.stdout.flush()
     
     training_elapsed = time.time() - training_start_time
     print(f"\nTraining complete: {training_elapsed:.1f}s ({training_elapsed/60:.1f}min)")
     print(f"  Avg per epoch: {training_elapsed/epochs:.1f}s")
+    print(f"  End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    sys.stdout.flush()
     
-    # Save model weights
+    # Save model weights (recreate output directory if needed)
     model_path = os.path.join(output_dir, 'autoencoder_clean.pth')
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
     torch.save(model.state_dict(), model_path)
+    print(f"Saved model to: {model_path}")
+    sys.stdout.flush()
     print(f"Saved model to: {model_path}")
     
     # Clear training memory
@@ -524,17 +643,19 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     with torch.no_grad():
         for i in range(tsne_sample_count):
             sample, _ = dataset[i]
-            _, latent = model(sample.unsqueeze(0))
+            sample = sample.unsqueeze(0).to(device)  # Move to GPU
+            _, latent = model(sample)
             all_latent.append(latent.cpu())
     improved_latent_full = torch.cat(all_latent, dim=0)
     
     # Compute reconstructions on viz subset
     with torch.no_grad():
+        data_tensor = data_tensor.to(device)  # Move to GPU
         improved_recon, _ = model(data_tensor)
         improved_recon = match_shape_center(improved_recon, (nrow, ncol))
     
     # STEP 6: Generate visualizations
-    data_np = data_tensor.squeeze(1).numpy()
+    data_np = data_tensor.squeeze(1).cpu().numpy()
     print(f"\nGenerating visualizations...")
     
     # Plot 1: Reconstruction comparison
@@ -550,7 +671,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         axes[0, i].imshow(data_np[i], cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
         axes[0, i].set_title(f'Input {i+1}')
         axes[0, i].axis('off')
-        imp_recon = improved_recon[i, 0].numpy()
+        imp_recon = improved_recon[i, 0].cpu().numpy()
         axes[1, i].imshow(imp_recon, cmap='viridis', origin='lower', aspect='auto', vmin=vmin_data, vmax=vmax_data)
         axes[1, i].set_title('Reconstruction')
         axes[1, i].axis('off')
@@ -579,7 +700,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     # Plot 3: t-SNE with clustering (auto-find optimal k)
     # Extract latent embeddings first (save even if t-SNE fails)
     imp_z = improved_latent_full.detach().cpu().numpy()
-    dataset_label = os.path.basename(data_dir.rstrip('/'))
+    # Handle both single directory (string) and multiple directories (list)
+    if isinstance(data_dir, list):
+        dataset_label = "CombinedDatasets"
+    else:
+        dataset_label = os.path.basename(data_dir.rstrip('/'))
     
     if TSNE is not None and improved_latent_full.shape[0] > 2:
         try:
@@ -686,7 +811,18 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"Saving latent embeddings ({imp_z.shape[0]} samples, {imp_z.shape[1]}-dim)...")
     
     # Extract filenames from dataset (only basenames, matching embedding order)
-    filenames = np.array([os.path.basename(dataset.file_paths[i]) for i in range(tsne_sample_count)], dtype=object)
+    if isinstance(dataset, ConcatDataset):
+        # For concatenated datasets, collect file_paths from all sub-datasets
+        all_file_paths = []
+        for ds in dataset.datasets:
+            all_file_paths.extend(ds.file_paths)
+        filenames = np.array([os.path.basename(all_file_paths[i]) for i in range(min(tsne_sample_count, len(all_file_paths)))], dtype=object)
+    else:
+        # For single dataset
+        filenames = np.array([os.path.basename(dataset.file_paths[i]) for i in range(tsne_sample_count)], dtype=object)
+    
+    # Generate reconstruction filenames (original name with _reconstr suffix)
+    reconstruction_filenames = np.array([f"{os.path.splitext(fn)[0]}_reconstr.mat" for fn in filenames], dtype=object)
     
     latent_data = {
         'latent_embeddings': imp_z,
@@ -695,28 +831,32 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         'optimal_k': optimal_k,
         'perplexity': perplexity,
         'dataset_label': dataset_label,
-        'filenames': filenames
+        'original_filenames': filenames,
+        'reconstruction_filenames': reconstruction_filenames
     }
     embeddings_path = os.path.join(output_dir, 'latent_embeddings.mat')
     savemat(embeddings_path, latent_data)
     print(f"Saved latent embeddings to: {embeddings_path}")
-    print(f"  -> Includes 'filenames' field mapping {len(filenames)} embeddings to source files")
+    print(f"  -> Includes 'original_filenames' and 'reconstruction_filenames' fields")
+    print(f"  -> Mapping {len(filenames)} embeddings to source files")
     print("  -> Use replot_tsne_from_saved.py to re-plot with different k values!")
     
     # STEP 7: Save JPEG reconstruction panels
     try:
-        panel_samples, filenames = select_samples_for_outputs(dataset, output_samples, seed)
+        panel_samples, panel_filenames = select_samples_for_outputs(dataset, output_samples, seed)
         panels_written = save_reconstruction_panels(model, panel_samples, output_dir, (nrow, ncol),
-                                                    dataset_label=dataset_label, filenames=filenames, 
-                                                    show_error=show_error)
+                                                    dataset_label=dataset_label, filenames=panel_filenames, 
+                                                    show_error=show_error, epochs=epochs, 
+                                                    latent_dim=latent_dim, channels=channels)
         print(f"Saved {panels_written} JPEG panel(s) ({panel_samples.shape[0]} samples)")
     except Exception as e:
         print(f"Warning: JPEG panels skipped: {e}")
     
-    # STEP 8: Save data and timing log
+    # STEP 8: Save reconstruction data with filenames
     sample_data = {
-        'spectrograms': data_np,
-        'reconstructions': improved_recon.squeeze().numpy()
+        'originals': data_np,
+        'reconstructions': improved_recon.squeeze().cpu().numpy(),
+        'filenames': panel_filenames
     }
     savemat(os.path.join(output_dir, 'reconstruction_data.mat'), sample_data)
     
@@ -767,8 +907,12 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fast Clean Autoencoder - Train from Scratch")
     parser.add_argument("--data-dir", 
-                       default="/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_MostlyManual.dir",
-                       help="Directory containing .mat files")
+                       nargs='+',
+                       default=[
+                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns.dir",
+                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_MostlyManual.dir"
+                       ],
+                       help="One or more directories containing .mat files (default: both datasets)")
     parser.add_argument("--n-samples", type=int, default=15, help="Visualization samples")
     parser.add_argument("--tsne-samples", type=int, default=None, help="t-SNE samples (default: n-samples)")
     parser.add_argument("--latent-dim", type=int, default=LATENT_DIM_DEFAULT, help="Latent dimension")
@@ -780,6 +924,8 @@ if __name__ == "__main__":
     parser.add_argument("--tsne-perplexity", type=float, default=None, help="t-SNE perplexity")
     parser.add_argument("--extra-conv", action='store_true', default=EXTRA_CONV_DEFAULT, help="Use 4 conv layers")
     parser.add_argument("--no-extra-conv", dest='extra_conv', action='store_false', help="Use 3 conv layers")
+    parser.add_argument("--kernel-size", type=int, default=3, choices=[3, 5], 
+                       help="Conv kernel size: 3x3 (default) or 5x5 (better for N/U-shaped calls)")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--output-samples", type=int, default=NUMBER_OUTPUT_IMAGE_SAMPLES, help="JPEG panel samples")
     parser.add_argument("--show-error", action='store_true', default=SHOW_ERROR_PLOTS, help="Show error row")
