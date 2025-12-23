@@ -27,10 +27,10 @@ warning off
 %%%Computer specific information
 [~,hostname]=system('hostname');
 if contains(hostname,'macmussel-2')
-    GSI_file_dir='/Volumes/Shared-1/Data/';
-    code_dir='/Users/thode/Projects/DeepLearningNPRBProject/Software';
+    GSI_file_dir='/Volumes/Shared-2/Data/';
+    code_dir='/Users/thode/Projects/DeepLearningNPRBProject/Software/matlab';
     WAV_file_dir='/Volumes/Bowhead4/';
-    Manual_record_files_dir='../Shell_Manual_Results';
+    Manual_record_files_dir='../../Shell_Manual_Results';
 
 else
     GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
@@ -64,8 +64,10 @@ year_want={'08','09','10','11','12','13','14'};  %What years to process
 Site={'2','3','4','5'};  %What sites to process
 
 year_want={'08','10','12','14'};
-Site={'5'};
+Site={'3'};
 
+year_want={'09'};
+Site={'3','5'};
 
 %%%%%%%%%Other parameters useful for debugging%%%%%%%%%%%%
 
@@ -478,11 +480,11 @@ for Iyear=1:length(year_want)
                         param.spec.plot_fmax=detect.fmax(II);
                         param.spec.duration=detect.duration(II);
                         param.spec.debug_max_tmid=1*60;
-                        if Idet<param.spec.debug_count
-                            param.spec.debug_plot=true;
-                        else
-                            param.spec.debug_plot=false;
-                        end
+                       % if Idet<param.spec.debug_count
+                        %    param.spec.debug_plot=true;
+                        %else
+                        %    param.spec.debug_plot=false;
+                       % end
                         [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                         if isempty(SNR_gram)
                             continue

@@ -32,10 +32,10 @@ eval(sprintf('!mkdir %s/Trash.dir',database_folder));
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
 
-year_want={'10','14'};
+year_want={'08','10','12','14'};
 Site={'3','5'};
 
-DASAR_strings='ABCDEFG';
+DASAR_strings='ABCDEFG';  %%No real harm if not all of htese exists
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
 SNR_gram_dims=[121 104];  %%%Dimensions expected to ensure consistentcy of data fed into autoencoder.
 
