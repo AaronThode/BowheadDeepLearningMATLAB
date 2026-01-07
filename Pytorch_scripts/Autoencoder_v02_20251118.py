@@ -64,7 +64,7 @@ SEED_DEFAULT = 42
 NUMBER_OUTPUT_IMAGE_SAMPLES = 30   # Reduced from 5000 for faster JPEG generation
 PANEL_GROUP_SIZE = 3
 SHOW_ERROR_PLOTS = False
-DEFAULT_VERSION_TAG = "08_100E_32LD_CombinedDatasets_100K"
+DEFAULT_VERSION_TAG = "v13_100E_32LD_32C_AutoManual_Combined_100K"
 TSNE_MAX_SAMPLES = None  # None => use all samples in dataset
 
 
@@ -125,10 +125,19 @@ def _minmax_norm(im: np.ndarray, auto_skip_if_unit: bool = True) -> np.ndarray:
 # ============================================================================
 
 class SNRDataset(Dataset):
-    """Memory-efficient Dataset loading .mat files on-demand."""
+    """Memory-efficient Dataset loading .mat files on-demand.
+    
+    Args:
+        directory: Path to directory containing .mat files
+        normalize: Whether to normalize spectrograms to [0, 1]
+        seed: Random seed for shuffling (None = no shuffle)
+        show_summary: Print dataset summary
+        max_samples: Maximum number of samples to use (None = use all)
+    """
     
     def __init__(self, directory: str, normalize: bool = True, 
-                 seed: int | None = None, show_summary: bool = False):
+                 seed: int | None = None, show_summary: bool = False,
+                 max_samples: int | None = None):
         self.normalize = normalize
         self.file_paths: list[str] = []
         
@@ -153,13 +162,22 @@ class SNRDataset(Dataset):
         
         self.target_shape = target_shape
         
+        # Shuffle before limiting (to get random subset)
         if seed is not None:
             rng = np.random.default_rng(seed)
             indices = rng.permutation(len(self.file_paths))
             self.file_paths = [self.file_paths[i] for i in indices]
         
+        # Limit to max_samples if specified
+        total_found = len(self.file_paths)
+        if max_samples is not None and max_samples < len(self.file_paths):
+            self.file_paths = self.file_paths[:max_samples]
+        
         if show_summary:
-            print(f"SNRDataset: {len(self)} files with shape {target_shape}")
+            if max_samples is not None and max_samples < total_found:
+                print(f"SNRDataset: {len(self)} files (limited from {total_found}) with shape {target_shape}")
+            else:
+                print(f"SNRDataset: {len(self)} files with shape {target_shape}")
     
     def __len__(self):
         return len(self.file_paths)
@@ -471,7 +489,8 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                                    tsne_samples: int | None = None, extra_conv: bool = EXTRA_CONV_DEFAULT,
                                    batch_size: int = 32, output_samples: int = NUMBER_OUTPUT_IMAGE_SAMPLES,
                                    version_tag: str = DEFAULT_VERSION_TAG, show_error: bool = SHOW_ERROR_PLOTS,
-                                   k_clusters: int = 2, tsne_perplexity: float | None = None):
+                                   k_clusters: int = 2, tsne_perplexity: float | None = None,
+                                   max_samples_per_dataset: int | None = None):
     """
     
     FRESH START GUARANTEES:
@@ -516,20 +535,26 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     if isinstance(data_dir, str):
         # Single directory (backward compatibility)
         print(f"\nLoading data from: {data_dir}")
+        if max_samples_per_dataset:
+            print(f"  Limiting to {max_samples_per_dataset:,} samples")
         dataset_label = os.path.basename(data_dir.rstrip('/'))
-        dataset = SNRDataset(data_dir, normalize=True, seed=seed, show_summary=True)
+        dataset = SNRDataset(data_dir, normalize=True, seed=seed, show_summary=True, 
+                            max_samples=max_samples_per_dataset)
     elif isinstance(data_dir, (list, tuple)):
         # Multiple directories - combine them
         print(f"\nLoading data from {len(data_dir)} directories:")
+        if max_samples_per_dataset:
+            print(f"  Limiting each dataset to {max_samples_per_dataset:,} samples")
         datasets = []
         for i, dir_path in enumerate(data_dir, 1):
             print(f"  [{i}] {dir_path}")
-            ds = SNRDataset(dir_path, normalize=True, seed=seed, show_summary=True)
+            ds = SNRDataset(dir_path, normalize=True, seed=seed, show_summary=True,
+                           max_samples=max_samples_per_dataset)
             datasets.append(ds)
-            print(f"      Loaded {len(ds)} samples")
+            print(f"      Using {len(ds):,} samples")
         dataset = ConcatDataset(datasets)
         dataset_label = f"Combined_{len(data_dir)}_datasets"
-        print(f"\nTotal combined samples: {len(dataset)}")
+        print(f"\nTotal combined samples: {len(dataset):,}")
     else:
         raise ValueError(f"data_dir must be str or list/tuple, got {type(data_dir)}")
     
@@ -909,10 +934,12 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", 
                        nargs='+',
                        default=[
-                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns.dir",
-                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_MostlyManual.dir"
+                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir",
+                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir"
                        ],
-                       help="One or more directories containing .mat files (default: both datasets)")
+                       help="One or more directories containing .mat files")
+    parser.add_argument("--max-samples-per-dataset", type=int, default=50000,
+                       help="Maximum samples to use from each dataset (default: 50000)")
     parser.add_argument("--n-samples", type=int, default=15, help="Visualization samples")
     parser.add_argument("--tsne-samples", type=int, default=None, help="t-SNE samples (default: n-samples)")
     parser.add_argument("--latent-dim", type=int, default=LATENT_DIM_DEFAULT, help="Latent dimension")
@@ -948,5 +975,6 @@ if __name__ == "__main__":
         version_tag=args.version_tag,
         show_error=args.show_error,
         k_clusters=args.k_clusters,
-        tsne_perplexity=args.tsne_perplexity
+        tsne_perplexity=args.tsne_perplexity,
+        max_samples_per_dataset=args.max_samples_per_dataset
     )

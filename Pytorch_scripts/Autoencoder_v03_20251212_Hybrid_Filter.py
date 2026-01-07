@@ -55,8 +55,9 @@ CHANNELS_DEFAULT = 32
 LATENT_DIM_DEFAULT = 32
 EXTRA_CONV_DEFAULT = False
 
+
 # Training parameters (optimized for speed)
-EPOCHS_DEFAULT = 100             # Reduced for faster iterations
+EPOCHS_DEFAULT = 100             # Full training for production
 LR_DEFAULT = 1e-3
 SEED_DEFAULT = 42
 
@@ -64,7 +65,7 @@ SEED_DEFAULT = 42
 NUMBER_OUTPUT_IMAGE_SAMPLES = 30   # Reduced from 5000 for faster JPEG generation
 PANEL_GROUP_SIZE = 3
 SHOW_ERROR_PLOTS = False
-DEFAULT_VERSION_TAG = "08_100E_32LD_CombinedDatasets_100K"
+DEFAULT_VERSION_TAG = "14_100E_32LD_32C_Hybrid5x5-3x3_CombinedDatasets_100K"
 TSNE_MAX_SAMPLES = None  # None => use all samples in dataset
 
 
@@ -133,9 +134,18 @@ class SNRDataset(Dataset):
         self.file_paths: list[str] = []
         
         target_shape = None
+        print(f"  Scanning for .mat files in: {directory}")
+        sys.stdout.flush()
         mat_files = sorted(glob.glob(os.path.join(directory, '**', '*.mat'), recursive=True))
+        total_files = len(mat_files)
+        print(f"  Found {total_files} .mat files, validating shapes...")
+        sys.stdout.flush()
         
-        for fp in mat_files:
+        for i, fp in enumerate(mat_files):
+            # Progress update every 5000 files
+            if i % 5000 == 0 and i > 0:
+                print(f"    Validated {i}/{total_files} files ({100*i/total_files:.1f}%)...")
+                sys.stdout.flush()
             try:
                 m = loadmat(fp)
                 im = m.get('SNR_gram', None)
@@ -187,24 +197,30 @@ class SNRDataset(Dataset):
 
 class ImprovedAutoencoder(nn.Module):
     """
-    Autoencoder with batch normalization and configurable kernel size.
+    TRUE HYBRID Autoencoder with configurable first-layer kernel size.
     ALWAYS INITIALIZED FROM SCRATCH - NO PRETRAINED WEIGHTS.
     
+    HYBRID ARCHITECTURE:
+        - First conv layer: Uses kernel_size (default 5×5) to capture broad N/U curve shapes
+        - Subsequent layers: Always use 3×3 to refine details efficiently
+    
+    This design captures the overall sweep pattern of whale calls in the first layer,
+    then refines local features in deeper layers.
+    
     Args:
-        kernel_size: Conv kernel size (3 or 5). Larger kernels (5×5) may better 
-                     capture N/U-shaped whale calls with broader temporal/frequency patterns.
+        kernel_size: First layer kernel size (3 or 5). 5×5 recommended for N/U calls.
     """
     
     def __init__(self, nrow=121, ncol=104, latent_dim=LATENT_DIM_DEFAULT, 
                  base_channels=CHANNELS_DEFAULT, extra_conv=EXTRA_CONV_DEFAULT,
-                 kernel_size=3):
+                 kernel_size=5):
         super().__init__()
         self.nrow, self.ncol = nrow, ncol
         self.extra_conv = extra_conv
         self.kernel_size = kernel_size
         
-        # Padding to maintain spatial dimensions: padding = (kernel_size - 1) // 2
-        padding = (kernel_size - 1) // 2
+        # HYBRID: First layer uses kernel_size, rest use 3×3
+        first_padding = (kernel_size - 1) // 2  # 2 for 5×5, 1 for 3×3
         
         if extra_conv:
             nrow_reduced = nrow // 16
@@ -220,19 +236,21 @@ class ImprovedAutoencoder(nn.Module):
         
         if extra_conv:
             self.encoder = nn.Sequential(
-                nn.Conv2d(1, c1, kernel_size, padding=padding),
+                # Layer 1: Large kernel (5×5) captures broad N/U curve patterns
+                nn.Conv2d(1, c1, kernel_size, padding=first_padding),
                 nn.BatchNorm2d(c1),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                nn.Conv2d(c1, c2, kernel_size, padding=padding),
+                # Layer 2+: Standard 3×3 kernels refine features
+                nn.Conv2d(c1, c2, 3, padding=1),
                 nn.BatchNorm2d(c2),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                nn.Conv2d(c2, c3, kernel_size, padding=padding),
+                nn.Conv2d(c2, c3, 3, padding=1),
                 nn.BatchNorm2d(c3),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                nn.Conv2d(c3, c4, kernel_size, padding=padding),
+                nn.Conv2d(c3, c4, 3, padding=1),
                 nn.BatchNorm2d(c4),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
@@ -240,15 +258,17 @@ class ImprovedAutoencoder(nn.Module):
             flat_size = c4 * nrow_reduced * ncol_reduced
         else:
             self.encoder = nn.Sequential(
-                nn.Conv2d(1, c1, kernel_size, padding=padding),
+                # Layer 1: Large kernel (5×5) captures broad N/U curve patterns
+                nn.Conv2d(1, c1, kernel_size, padding=first_padding),
                 nn.BatchNorm2d(c1),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                nn.Conv2d(c1, c2, kernel_size, padding=padding),
+                # Layer 2+: Standard 3×3 kernels refine features
+                nn.Conv2d(c1, c2, 3, padding=1),
                 nn.BatchNorm2d(c2),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                nn.Conv2d(c2, c3, kernel_size, padding=padding),
+                nn.Conv2d(c2, c3, 3, padding=1),
                 nn.BatchNorm2d(c3),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
@@ -920,8 +940,8 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", 
                        nargs='+',
                        default=[
-                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns.dir",
-                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_MostlyManual.dir"
+                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir",
+                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir"
                        ],
                        help="One or more directories containing .mat files (default: both datasets)")
     parser.add_argument("--n-samples", type=int, default=15, help="Visualization samples")
@@ -935,8 +955,8 @@ if __name__ == "__main__":
     parser.add_argument("--tsne-perplexity", type=float, default=None, help="t-SNE perplexity")
     parser.add_argument("--extra-conv", action='store_true', default=EXTRA_CONV_DEFAULT, help="Use 4 conv layers")
     parser.add_argument("--no-extra-conv", dest='extra_conv', action='store_false', help="Use 3 conv layers")
-    parser.add_argument("--kernel-size", type=int, default=3, choices=[3, 5], 
-                       help="Conv kernel size: 3x3 (default) or 5x5 (better for N/U-shaped calls)")
+    parser.add_argument("--kernel-size", type=int, default=5, choices=[3, 5], 
+                       help="Conv kernel size: 3x3 or 5x5 (default, better for N/U-shaped calls)")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--output-samples", type=int, default=NUMBER_OUTPUT_IMAGE_SAMPLES, help="JPEG panel samples")
     parser.add_argument("--show-error", action='store_true', default=SHOW_ERROR_PLOTS, help="Show error row")

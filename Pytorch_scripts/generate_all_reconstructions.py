@@ -401,17 +401,11 @@ def generate_reconstructions(model_version, output_format='mat', batch_size=32):
                     orig_name = os.path.splitext(orig_basename)[0]
                     output_basename = f"{orig_name}_reconstr"
                 
-                # Save in requested format(s)
+                # Save in requested format(s) - MINIMAL DATA ONLY
                 if output_format in ['mat', 'both']:
                     output_path_mat = os.path.join(output_dir, f"{output_basename}.mat")
-                    savemat(output_path_mat, {
-                        'spec_sample': recon_np,
-                        'sample_index': sample_idx,
-                        'original_file': orig_basename,
-                        'reconstruction_file': f"{output_basename}.mat",
-                        'reconstruction_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'model_version': model_version
-                    })
+                    # Only save the reconstruction spectrogram, no metadata
+                    savemat(output_path_mat, {'spec_sample': recon_np})
                 
                 if output_format in ['npy', 'both']:
                     output_path_npy = os.path.join(output_dir, f"{output_basename}.npy")

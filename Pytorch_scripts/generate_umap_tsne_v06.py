@@ -30,7 +30,7 @@ import time
 # ============================================================================
 
 # Dataset directory - v06 MostlyManual 50K
-DATASET_DIR = '/Users/oceaneboulais/Github/ThodeLab/BowheadDeepLearningMATLAB/results/Autoencoder_v06_100E_32LD_MostlyManual_50K_Date20251121-170008.dir'
+DATASET_DIR = '/Users/oceaneboulais/Github/ThodeLab/BowheadDeepLearningMATLAB/results/Autoencoder_v11_100E_32LD_32C_HybridFilter5x5_CombinedDatasets_100K_Date20251219-115035.dir'
 INPUT_FILE = 'latent_embeddings.mat'
 OUTPUT_FILE = 'umap_tsne_embeddings.mat'
 
@@ -42,7 +42,7 @@ UMAP_PARAMS = {
     #   - Medium (30-50): Balanced view, recommended for large datasets
     #   - Large (100+): Emphasizes broad global structure
     #   - Here: 30 = fast computation while preserving meaningful local structure
-    'n_neighbors': 30,
+    'n_neighbors': 60,
     
     # min_dist: Minimum distance between points in the low-dimensional space
     #   - Controls how tightly UMAP packs points together
@@ -129,7 +129,7 @@ TSNE_PARAMS = {
 # ============================================================================
 
 print("="*80)
-print("GENERATE UMAP AND t-SNE EMBEDDINGS FOR v06 DATASET (MostlyManual 50K)")
+print("GENERATE UMAP AND t-SNE EMBEDDINGS FOR v11 DATASET (Combined 100K)")
 print("="*80)
 print(f"\nDataset: {os.path.basename(DATASET_DIR)}")
 print(f"Input:   {INPUT_FILE}")
