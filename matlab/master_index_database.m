@@ -1,6 +1,10 @@
 %%%%master_index_database.m%%%%%
 %
 %   RUN THIS SCRIPT AFTER master_create_datasets.m BUT BEFORE  master_assemble_unsupervised_database.m
+%       ALSO REVIEW AND CLEAN THE DATABASE SO THAT SAME DATES ARE PRESENT AT
+%       ALL SITES FOR A GIVEN YEAR.  THE PREVIOUS SCRIPT WILL SOMETIMES CREATE
+%       EXTRA DAYS AT A SITE IF MANUAL CALLS ARE VERY CLOSE TO THE START OR END
+%       OF A DAY.
 %   This script counts all the files in the new database and makes two
 %   indexing variables that are stored at the top-level of database in
 %   'Database_index.mat'
