@@ -68,3 +68,5 @@ Pytorch_scripts/trained_models/
 !GSI_header_table.mat
 
 *.pdf
+Pytorch_scripts/Archived_Scripts/conv_autoencoder.pth
+Pytorch_scripts/Bash/miniconda.sh

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-FAST CLEAN AUTOENCODER - Training from Scratch (v03)
-
 GUARANTEED FRESH START:
 - No model loading or transfer learning
 - No checkpoint resuming
@@ -16,9 +14,8 @@ PERFORMANCE OPTIMIZATIONS:
 - Reduced default epochs (10 instead of 50) for quick iterations
 
 USAGE:
-    python Autoencoder_FastClean_v03.py [--epochs 10] [--lr 1e-3] [--seed 42]
-
-All outputs saved to results/Autoencoder_v03_Date<TIMESTAMP>.dir/
+source .venv_py31018/bin/activate
+python3 Autoencoder_v02_20251118.py
 """
 import torch
 import torch.nn as nn
@@ -44,7 +41,15 @@ except Exception:
     TSNE = None
     KMeans = None
     silhouette_score = None
+
+try:
+    import umap
+    UMAP = umap.UMAP
+except Exception:
+    UMAP = None
+
 import argparse
+from typing import Optional, Tuple, List
 
 # ============================================================================
 # GLOBAL CONFIGURATION PARAMETERS
@@ -55,16 +60,17 @@ CHANNELS_DEFAULT = 32
 LATENT_DIM_DEFAULT = 32
 EXTRA_CONV_DEFAULT = False
 
-# Training parameters (optimized for speed)
+# Training parameters 
 EPOCHS_DEFAULT = 100             # Reduced for faster iterations
 LR_DEFAULT = 1e-3
 SEED_DEFAULT = 42
 
-# Output parameters (minimized for speed)
+# Output parameters 
 NUMBER_OUTPUT_IMAGE_SAMPLES = 30   # Reduced from 5000 for faster JPEG generation
 PANEL_GROUP_SIZE = 3
 SHOW_ERROR_PLOTS = False
-DEFAULT_VERSION_TAG = "v13_100E_32LD_32C_AutoManual_Combined_100K"
+ENABLE_UMAP = True  # Set to False to skip UMAP computation
+DEFAULT_VERSION_TAG = "14_100E_32LD_32C_Manual_100K"
 TSNE_MAX_SAMPLES = None  # None => use all samples in dataset
 
 
@@ -84,19 +90,25 @@ def set_global_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def create_output_directory(version_tag: str | None = None) -> str:
-    """Create unique timestamped output directory."""
+def create_output_directory(version_tag: Optional[str] = None) -> str:
+    """Create unique timestamped output directory with organized subdirectories."""
     tag = (version_tag or DEFAULT_VERSION_TAG).strip().replace(' ', '_')
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dir_name = f"Autoencoder_v{tag}_Date{timestamp}.dir"
     
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    repo_root = os.path.dirname(script_dir)
-    results_dir = os.path.join(repo_root, "results")
+    # Output to specified directory
+    results_dir = "/Users/oboulais/Desktop/Bowhead_DL_Project/LD32"
     os.makedirs(results_dir, exist_ok=True)
     
     output_dir = os.path.join(results_dir, dir_name)
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Create organized subdirectories
+    os.makedirs(os.path.join(output_dir, 'MATLAB'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'image_results'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'trained_model'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'UMAP'), exist_ok=True)
+    
     return output_dir
 
 
@@ -136,10 +148,10 @@ class SNRDataset(Dataset):
     """
     
     def __init__(self, directory: str, normalize: bool = True, 
-                 seed: int | None = None, show_summary: bool = False,
-                 max_samples: int | None = None):
+                 seed: Optional[int] = None, show_summary: bool = False,
+                 max_samples: Optional[int] = None):
         self.normalize = normalize
-        self.file_paths: list[str] = []
+        self.file_paths: List[str] = []
         
         target_shape = None
         mat_files = sorted(glob.glob(os.path.join(directory, '**', '*.mat'), recursive=True))
@@ -321,7 +333,7 @@ class ImprovedAutoencoder(nn.Module):
         return output, latent
 
 
-def match_shape_center(recon: torch.Tensor, target_hw: tuple[int, int]) -> torch.Tensor:
+def match_shape_center(recon: torch.Tensor, target_hw: Tuple[int, int]) -> torch.Tensor:
     """Center-crop or pad reconstruction to match target dimensions."""
     _, _, rH, rW = recon.shape
     tH, tW = target_hw
@@ -344,7 +356,7 @@ def match_shape_center(recon: torch.Tensor, target_hw: tuple[int, int]) -> torch
     return recon
 
 
-def select_samples_for_outputs(dataset: Dataset, n_samples: int, seed: int | None) -> tuple[torch.Tensor, list[str]]:
+def select_samples_for_outputs(dataset: Dataset, n_samples: int, seed: Optional[int]) -> Tuple[torch.Tensor, List[str]]:
     """Select random samples for JPEG panel generation."""
     if dataset is None or len(dataset) == 0:
         raise RuntimeError("No data available for output sampling")
@@ -375,13 +387,15 @@ def select_samples_for_outputs(dataset: Dataset, n_samples: int, seed: int | Non
 
 
 def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_dir: str,
-                               target_hw: tuple[int, int], base_name: str = "recon_panel",
-                               dataset_label: str = "", filenames: list[str] = None, 
+                               target_hw: Tuple[int, int], base_name: str = "recon_panel",
+                               dataset_label: str = "", filenames: Optional[List[str]] = None, 
                                show_error: bool = SHOW_ERROR_PLOTS, epochs: int = 100,
-                               latent_dim: int = 32, channels: int = 64) -> int:
+                               latent_dim: int = 32, channels: int = 64, device: torch.device = None) -> int:
     """Save JPEG panels showing reconstructions with proper axis labels."""
     if samples is None or samples.shape[0] == 0:
         return 0
+    if device is None:
+        device = next(model.parameters()).device
     os.makedirs(output_dir, exist_ok=True)
     num_samples = samples.shape[0]
     group_count = math.ceil(num_samples / PANEL_GROUP_SIZE)
@@ -396,7 +410,7 @@ def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_d
     for group_idx in range(group_count):
         start = group_idx * PANEL_GROUP_SIZE
         end = min(start + PANEL_GROUP_SIZE, num_samples)
-        batch = samples[start:end]
+        batch = samples[start:end].to(device)
         with torch.no_grad():
             recon, _ = model(batch)
             recon = match_shape_center(recon, target_hw)
@@ -484,13 +498,13 @@ def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_d
 # ============================================================================
 
 def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_dim: int = LATENT_DIM_DEFAULT,
-                                   channels: int = CHANNELS_DEFAULT, seed: int | None = SEED_DEFAULT,
+                                   channels: int = CHANNELS_DEFAULT, seed: Optional[int] = SEED_DEFAULT,
                                    epochs: int = EPOCHS_DEFAULT, lr: float = LR_DEFAULT,
-                                   tsne_samples: int | None = None, extra_conv: bool = EXTRA_CONV_DEFAULT,
+                                   tsne_samples: Optional[int] = None, extra_conv: bool = EXTRA_CONV_DEFAULT,
                                    batch_size: int = 32, output_samples: int = NUMBER_OUTPUT_IMAGE_SAMPLES,
                                    version_tag: str = DEFAULT_VERSION_TAG, show_error: bool = SHOW_ERROR_PLOTS,
-                                   k_clusters: int = 2, tsne_perplexity: float | None = None,
-                                   max_samples_per_dataset: int | None = None):
+                                   k_clusters: int = 2, tsne_perplexity: Optional[float] = None,
+                                   max_samples_per_dataset: Optional[int] = None):
     """
     
     FRESH START GUARANTEES:
@@ -510,11 +524,18 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     script_start_time = time.time()
     
     # STEP 0: Set device (GPU if available, else CPU)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
-    if torch.cuda.is_available():
+    # Prioritize MPS (Apple Silicon) > CUDA > CPU
+    if torch.backends.mps.is_available():
+        device = torch.device('mps')
+        print(f"Using device: {device} (Apple Metal)")
+    elif torch.cuda.is_available():
+        device = torch.device('cuda')
+        print(f"Using device: {device}")
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"CUDA Version: {torch.version.cuda}")
+    else:
+        device = torch.device('cpu')
+        print(f"Using device: {device} (WARNING: No GPU detected)")
     sys.stdout.flush()
     
     # STEP 1: Initialize random seed for reproducible FROM-SCRATCH initialization
@@ -630,8 +651,9 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         
         # Save checkpoint every 10 epochs for recovery
         if (epoch + 1) % 10 == 0:
-            checkpoint_path = os.path.join(output_dir, f'checkpoint_epoch{epoch+1}.pth')
-            os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+            checkpoint_dir = os.path.join(output_dir, 'trained_model')
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch{epoch+1}.pth')
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
@@ -648,13 +670,19 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"  End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     sys.stdout.flush()
     
-    # Save model weights (recreate output directory if needed)
-    model_path = os.path.join(output_dir, 'autoencoder_clean.pth')
-    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    # Save model weights to trained_model subdirectory
+    model_path = os.path.join(output_dir, 'trained_model', 'autoencoder_clean.pth')
     torch.save(model.state_dict(), model_path)
     print(f"Saved model to: {model_path}")
     sys.stdout.flush()
-    print(f"Saved model to: {model_path}")
+    
+    # Save model weights as MATLAB-compatible .mat file in MATLAB subdirectory
+    mat_path = os.path.join(output_dir, 'MATLAB', 'autoencoder_clean.mat')
+    state_dict = model.state_dict()
+    mat_dict = {key: value.cpu().numpy() for key, value in state_dict.items()}
+    savemat(mat_path, mat_dict)
+    print(f"Saved model to MATLAB format: {mat_path}")
+    sys.stdout.flush()
     
     # Clear training memory
     del train_loader
@@ -708,7 +736,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     
     plt.suptitle(f'Autoencoder Reconstructions (epochs={epochs}, latent_dim={latent_dim})')
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'reconstructions.png'), dpi=200, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, 'image_results', 'reconstructions.png'), dpi=200, bbox_inches='tight')
     plt.close()
     
     # Plot 2: Training loss
@@ -719,7 +747,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     plt.title(f'Training Loss (epochs={epochs})')
     plt.yscale('log')
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'training_loss.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'image_results', 'training_loss.png'), dpi=150)
     plt.close()
     
     # Plot 3: t-SNE with clustering (auto-find optimal k)
@@ -770,7 +798,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                 plt.legend()
                 plt.grid(True, alpha=0.3)
                 plt.tight_layout()
-                plt.savefig(os.path.join(output_dir, 'optimal_k_analysis.png'), dpi=150)
+                plt.savefig(os.path.join(output_dir, 'image_results', 'optimal_k_analysis.png'), dpi=150)
                 plt.close()
             elif k_clusters is None or k_clusters == 0:
                 optimal_k = 2  # Fallback if silhouette unavailable
@@ -803,7 +831,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                        ha='right', va='bottom', fontsize=7, style='italic', alpha=0.6)
             
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, 'tsne_latent.png'), dpi=160)
+            plt.savefig(os.path.join(output_dir, 'image_results', 'tsne_latent.png'), dpi=160)
             plt.close()
             
             # Save latent embeddings and t-SNE results for re-plotting without retraining
@@ -815,8 +843,8 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                 'perplexity': perplexity,
                 'dataset_label': dataset_label
             }
-            savemat(os.path.join(output_dir, 'latent_embeddings.mat'), latent_data)
-            print(f"Saved latent embeddings to latent_embeddings.mat (re-plot without retraining!)")
+            savemat(os.path.join(output_dir, 'MATLAB', 'latent_embeddings.mat'), latent_data)
+            print(f"Saved latent embeddings to MATLAB/latent_embeddings.mat (re-plot without retraining!)")
             
         except Exception as e:
             print(f"Warning: t-SNE visualization skipped: {e}")
@@ -859,20 +887,72 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         'original_filenames': filenames,
         'reconstruction_filenames': reconstruction_filenames
     }
-    embeddings_path = os.path.join(output_dir, 'latent_embeddings.mat')
+    embeddings_path = os.path.join(output_dir, 'MATLAB', 'latent_embeddings.mat')
     savemat(embeddings_path, latent_data)
     print(f"Saved latent embeddings to: {embeddings_path}")
     print(f"  -> Includes 'original_filenames' and 'reconstruction_filenames' fields")
     print(f"  -> Mapping {len(filenames)} embeddings to source files")
     print("  -> Use replot_tsne_from_saved.py to re-plot with different k values!")
     
+    # Plot 4: UMAP visualization (if enabled and available)
+    if ENABLE_UMAP and UMAP is not None and improved_latent_full.shape[0] > 2:
+        try:
+            print(f"Computing UMAP on {improved_latent_full.shape[0]} samples...")
+            umap_reducer = UMAP(n_components=2, random_state=int(seed) if seed else 0, n_neighbors=15, min_dist=0.1)
+            umap_emb = umap_reducer.fit_transform(imp_z)
+            
+            # Use same clusters from t-SNE/k-means if available
+            umap_clusters = clusters
+            
+            # Generate UMAP plot
+            cmap = plt.cm.get_cmap('tab10', optimal_k)
+            plt.figure(figsize=(7, 6))
+            
+            for cluster_id in range(optimal_k):
+                mask = umap_clusters == cluster_id
+                color = cmap(cluster_id)
+                plt.scatter(umap_emb[mask, 0], umap_emb[mask, 1], 
+                           c=[color], alpha=0.85, s=28, label=f'Cluster {cluster_id}')
+            
+            plt.title(f'UMAP Latent Space (k={optimal_k})')
+            plt.xlabel('UMAP 1')
+            plt.ylabel('UMAP 2')
+            plt.legend(loc='upper right', fontsize=8, framealpha=0.9, ncol=(2 if optimal_k > 5 else 1))
+            plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', 
+                       ha='right', va='bottom', fontsize=7, style='italic', alpha=0.6)
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_latent.png'), dpi=160)
+            plt.close()
+            
+            # Save UMAP embeddings
+            umap_data = {
+                'latent_embeddings': imp_z,
+                'umap_embeddings': umap_emb,
+                'clusters': umap_clusters,
+                'optimal_k': optimal_k,
+                'dataset_label': dataset_label,
+                'original_filenames': filenames,
+                'reconstruction_filenames': reconstruction_filenames
+            }
+            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings.mat'), umap_data)
+            print(f"Saved UMAP embeddings to UMAP/umap_embeddings.mat")
+            
+        except Exception as e:
+            print(f"Warning: UMAP visualization skipped: {e}")
+    elif not ENABLE_UMAP:
+        print("UMAP visualization disabled (ENABLE_UMAP=False)")
+    else:
+        print("Warning: UMAP not available or insufficient samples")
+    
     # STEP 7: Save JPEG reconstruction panels
     try:
         panel_samples, panel_filenames = select_samples_for_outputs(dataset, output_samples, seed)
-        panels_written = save_reconstruction_panels(model, panel_samples, output_dir, (nrow, ncol),
+        panels_written = save_reconstruction_panels(model, panel_samples, 
+                                                    os.path.join(output_dir, 'image_results'), 
+                                                    (nrow, ncol),
                                                     dataset_label=dataset_label, filenames=panel_filenames, 
                                                     show_error=show_error, epochs=epochs, 
-                                                    latent_dim=latent_dim, channels=channels)
+                                                    latent_dim=latent_dim, channels=channels, device=device)
         print(f"Saved {panels_written} JPEG panel(s) ({panel_samples.shape[0]} samples)")
     except Exception as e:
         print(f"Warning: JPEG panels skipped: {e}")
@@ -883,7 +963,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         'reconstructions': improved_recon.squeeze().cpu().numpy(),
         'filenames': panel_filenames
     }
-    savemat(os.path.join(output_dir, 'reconstruction_data.mat'), sample_data)
+    savemat(os.path.join(output_dir, 'MATLAB', 'reconstruction_data.mat'), sample_data)
     
     script_elapsed = time.time() - script_start_time
     timing_log = [
@@ -930,16 +1010,15 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
 # ============================================================================
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fast Clean Autoencoder - Train from Scratch")
+    parser = argparse.ArgumentParser(description="Autoencoder_v02_LD32")
     parser.add_argument("--data-dir", 
                        nargs='+',
                        default=[
-                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir",
-                           "/Users/oceaneboulais/Github/ThodeLab/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir"
+                           "/Users/oboulais/Desktop/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir"
                        ],
                        help="One or more directories containing .mat files")
-    parser.add_argument("--max-samples-per-dataset", type=int, default=50000,
-                       help="Maximum samples to use from each dataset (default: 50000)")
+    parser.add_argument("--max-samples-per-dataset", type=int, default=None,
+                       help="Maximum samples to use from each dataset (default: None = use all)")
     parser.add_argument("--n-samples", type=int, default=15, help="Visualization samples")
     parser.add_argument("--tsne-samples", type=int, default=None, help="t-SNE samples (default: n-samples)")
     parser.add_argument("--latent-dim", type=int, default=LATENT_DIM_DEFAULT, help="Latent dimension")
