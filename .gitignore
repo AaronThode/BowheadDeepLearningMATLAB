@@ -17,6 +17,7 @@ Pytorch_scripts/.venv*/
 Spectrogram_Image_Database.dir/
 Pytorch_scripts/Spectrogram_Image_Database.dir/
 Azigram_pulse_detector.dir/
+Pytorch_scripts/Bash/
 
 # Model files, plots, and results directories (NEVER commit these!)
 models/
