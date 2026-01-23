@@ -8,6 +8,7 @@ __pycache__/
 # Virtual environments (do not commit)
 .venv/
 .venv*/
+.venv_*/
 venv/
 env/
 Pytorch_scripts/.venv/
@@ -69,4 +70,11 @@ Pytorch_scripts/trained_models/
 
 *.pdf
 Pytorch_scripts/Archived_Scripts/conv_autoencoder.pth
+Pytorch_scripts/Bash/miniconda.sh
+
+# Shell installers and large binaries
+*.sh
+!Pytorch_scripts/Bash/*.sh
+
+# Exclude specific large installer
 Pytorch_scripts/Bash/miniconda.sh
