@@ -8,6 +8,7 @@ __pycache__/
 # Virtual environments (do not commit)
 .venv/
 .venv*/
+.venv_*/
 venv/
 env/
 Pytorch_scripts/.venv/
@@ -29,10 +30,68 @@ results/
 *.ckpt
 *.weights
 
-# Optional: ignore local experiment outputs (comment out to include)
-# *.log
-*.asv
+# Model files and training outputs (NEVER commit these!)
+*.pth
+*.h5
+*.pkl
+*.ckpt
+*.weights
+
+# Data files (NEVER commit these!)
 *.mat
+*.npy
+*.npz
+
+# Image outputs (NEVER commit these!)
 *.jpg
+<<<<<<< HEAD
 *.png
 diary_output.txt
+=======
+*.jpeg
+*.png
+*.gif
+
+# Text logs and outputs
+*.log
+*.txt
+*.asv
+
+# Result directories (NEVER commit these!)
+Autoencoder_v*/
+*.dir/
+models/
+plots/
+runs/
+results/
+Pytorch_scripts/runs/
+Pytorch_scripts/models/
+Pytorch_scripts/plots/
+Pytorch_scripts/results/
+Pytorch_scripts/Misc_outputs*/
+Pytorch_scripts/Autoencoder_*/
+Pytorch_scripts/trained_models/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exception: Keep essential MATLAB reference files (small)
+!GSI_header_table.mat
+
+*.pdf
+Pytorch_scripts/Archived_Scripts/conv_autoencoder.pth
+Pytorch_scripts/Bash/miniconda.sh
+
+# Shell installers and large binaries
+*.sh
+!Pytorch_scripts/Bash/*.sh
+
+# Exclude specific large installer
+Pytorch_scripts/Bash/miniconda.sh
+>>>>>>> OB-branch
