@@ -1,5 +1,5 @@
 %%%sample rotate image
-function GIF_movie_demo(x,type,alpha_value,titstr)
+function GIF_movie_demo(x,type,alpha_value,titstr,initial_azi,initial_el)
 % Create sample 3D scatter data
 %rng(0);
 %n = 500;
@@ -17,7 +17,7 @@ s = scatter3(ax, x(:,1), x(:,2),x(:,3), 3, type, 'filled');
 s.MarkerEdgeAlpha=alpha_value;
 s.MarkerFaceAlpha=alpha_value;
       
-colormap(parula)
+colormap(jet)
 colorbar
 axis equal
 xlabel('T-SNE Dimension 1');
@@ -26,26 +26,33 @@ zlabel('T-SNE Dimension 3');
 title(titstr);
 
 % Lighting and view
-view(45,25)
+%view(45,25)
+view(initial_azi,initial_el);
 grid on
+xlim([-2 2]);ylim([-2 2]);zlim([-2 2]);
+
 drawnow
 
 % Parameters for rotation and output
 nFrames = 120;         % number of frames in full rotation
-az0 = 45;              % starting azimuth
-el = 25;               % elevation (fixed)
+az0 = initial_azi;              % starting azimuth
+el =initial_el;               % elevation (fixed)
 outputGIF = true;      % set false to skip GIF creation
 gifName = 'rotating_scatter.gif';
-delayTime = 4*0.03;      % delay between frames in seconds
+delayTime = 8*0.03;      % delay between frames in seconds
 
 % Preallocate capture
 frames(nFrames) = struct('cdata',[],'colormap',[]);
 
 % Rotate by changing azimuth angle
+
+axis vis3d
 for k = 1:nFrames
-    az = az0 + 360*(k-1)/nFrames;
-    view(ax, az, el)
-    xlim([-2 2]);ylim([-2 2]);zlim([-2 2]);
+    az = bnorm(az0 + 360*(k-1)/nFrames);
+    %view(ax, az, el)
+
+    camorbit(360/nFrames,0)
+    title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el))
     drawnow
     frames(k) = getframe(fig);
     if outputGIF
