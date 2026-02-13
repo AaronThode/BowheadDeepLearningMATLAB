@@ -4,12 +4,13 @@ function scatter3_limits_with_azel_edits(X0,type)
 % and edit boxes for Azimuth and Elevation
 rng(0)
 %X0 = randn(500,3);
-alpha_value=0.1;
+alpha_value=0.3;
+sizze=8;
 
 % Figure and axes
 fig = figure('Name','Scatter3 Limits & Az/El Edits','Units','normalized','Position',[0.05 0.5 0.8 0.8]);
 ax = axes('Parent',fig,'Position',[0.05 0.15 0.75 0.8]);
-h = scatter3(ax,X0(:,1),X0(:,2),X0(:,3),3,type,'filled');
+h = scatter3(ax,X0(:,1),X0(:,2),X0(:,3),sizze,type,'filled');
 h.MarkerEdgeAlpha=alpha_value;
 h.MarkerFaceAlpha=alpha_value;
 xlabel('x');ylabel('y');zlabel('z');
@@ -60,7 +61,7 @@ ud.chk = chk;
 fig.UserData = ud;
 
 % Initialize symmetric limits [-3 3] and update display
-setInitialLimits([-3 3], [-3 3], [-3 3]);
+%setInitialLimits([-3 3], [-3 3], [-3 3]);
 updateDisplay();
 
 % --- Callbacks -------------------------------------------------------

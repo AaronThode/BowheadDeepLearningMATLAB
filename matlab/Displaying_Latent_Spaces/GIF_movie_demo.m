@@ -13,23 +13,33 @@ fig = figure('Color','w','Position',[200 200 700 600]);
 ax = axes('Parent',fig);
 % ss(Idir,J)=scatter3(data.x_tsne(Itype,1), data.x_tsne(Itype,2), data.x_tsne(Itype,3), 3,type(Itype),'filled');
 
-s = scatter3(ax, x(:,1), x(:,2),x(:,3), 3, type, 'filled');
-s.MarkerEdgeAlpha=alpha_value;
-s.MarkerFaceAlpha=alpha_value;
-      
+%%%Plot different symbols for different types
+str={'o','square','diamond'};
+
+types=unique(type);
+
+for I=1:length(types)
+    Itype=find(type==types(I));
+    s{I} = scatter3(ax, x(Itype,1), x(Itype,2),x(Itype,3), 3, type(Itype),'filled');
+    s{I}.MarkerEdgeAlpha=alpha_value;
+    s{I}.MarkerFaceAlpha=alpha_value;
+    s{I}.Marker=str{I};
+    hold on
+end
+
 colormap(jet)
 colorbar
 axis equal
-xlabel('T-SNE Dimension 1');
-ylabel('T-SNE Dimension 2');
-zlabel('T-SNE Dimension 3');
+xlabel('UMAP Dimension 1');
+ylabel('UMAP Dimension 2');
+zlabel('UMAP Dimension 3');
 title(titstr);
 
 % Lighting and view
 %view(45,25)
 view(initial_azi,initial_el);
 grid on
-xlim([-2 2]);ylim([-2 2]);zlim([-2 2]);
+%xlim([-2 2]);ylim([-2 2]);zlim([-2 2]);
 
 drawnow
 
