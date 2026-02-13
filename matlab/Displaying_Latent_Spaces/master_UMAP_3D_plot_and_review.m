@@ -7,7 +7,7 @@ clear all
 dataset_chc='auto';
 UMAP_dim=3;   %Dimension of UMAP to load
 
-Database_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/TrainedModels.dir/';
+%Database_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/TrainedModels.dir/';
 Database_dir='/Volumes/Bowhead_DL_Project/';
 switch dataset_chc
 
@@ -21,7 +21,8 @@ switch dataset_chc
         Nplots=2;
     case 'auto'
        % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
-  dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
+        dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
+        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_Auto_SNR+NTV_100K_Date20260212-085534.dir']};
 
         images_dir{1,1}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir';
         images_dir{1,2}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir';
