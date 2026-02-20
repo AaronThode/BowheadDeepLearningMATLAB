@@ -9,7 +9,8 @@ function GIF_movie_demo(x,type,alpha_value,titstr,initial_azi,initial_el)
 %c = sqrt(X.^2+Y.^2+Z.^2);
 
 % Create figure and initial scatter3
-fig = figure('Color','w','Position',[200 200 700 600]);
+scale=2;
+fig = figure('Color','w','Position',[200 200 700/scale 600/scale]);
 ax = axes('Parent',fig);
 % ss(Idir,J)=scatter3(data.x_tsne(Itype,1), data.x_tsne(Itype,2), data.x_tsne(Itype,3), 3,type(Itype),'filled');
 
@@ -33,7 +34,7 @@ axis equal
 xlabel('UMAP Dimension 1');
 ylabel('UMAP Dimension 2');
 zlabel('UMAP Dimension 3');
-title(titstr);
+%title(titstr);
 
 % Lighting and view
 %view(45,25)
@@ -44,7 +45,7 @@ grid on
 drawnow
 
 % Parameters for rotation and output
-nFrames = 120;         % number of frames in full rotation
+nFrames = 120/2;         % number of frames in full rotation
 az0 = initial_azi;              % starting azimuth
 el =initial_el;               % elevation (fixed)
 outputGIF = true;      % set false to skip GIF creation
@@ -58,11 +59,11 @@ frames(nFrames) = struct('cdata',[],'colormap',[]);
 
 axis vis3d
 for k = 1:nFrames
-    az = bnorm(az0 + 360*(k-1)/nFrames);
+    az = bnorm(az0 + 180*(k-1)/nFrames);
     %view(ax, az, el)
 
     camorbit(360/nFrames,0)
-    title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el))
+    %title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el))
     drawnow
     frames(k) = getframe(fig);
     if outputGIF
