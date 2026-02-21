@@ -5,7 +5,7 @@ close all
 clear all
 
 dataset_chc='auto';
-UMAP_dim=3;   %Dimension of UMAP to load
+UMAP_dim=5;   %Dimension of UMAP to load
 
 %Database_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/TrainedModels.dir/';
 Database_dir='/Volumes/Bowhead_DL_Project/';
@@ -38,11 +38,24 @@ for Idir=1:length(dir_names)
     data=load(sprintf('umap_embeddings_%id.mat',UMAP_dim));
     field_want=sprintf('umap_embeddings_%id',UMAP_dim);
     x=data.(field_want);
+
+    if UMAP_dim==5
+        [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
+        %coeff: projection of original axes onto new orthogonal axes (5
+        %by 3 matrix)
+        %
+        % score:  translation of each data point into the new PCA
+        % coordinates
+        %  latent: variance of each column of score
+        %  explained: percent varience explained by PCA component.
+        %  Used to judge which components to keep
+        x=score;
+    end
     %%update UMAP if data doesn't exist
     % save_flag=false;
     % if ~isfield(data,'x_tsne')
     %     disp('Recomputing tSNE...')
-    %     data.x_tsne=tsne(data.latent_embeddings,'NumDimensions',3);
+    %     data.x_tsne=tsne(data.latent_embeddings,'NumDimensions',3);siz
     %     save_flag=true;
     %     save('latent_embeddings.mat','-struct','data');
     % 
@@ -71,7 +84,7 @@ for Idir=1:length(dir_names)
                         alpha_value=0.5;
                 end
             case 'auto'
-                type(type>0)=1;
+                %type(type>0)=1;
                 Itype=1:length(type);
                 alpha_value=0.3;
                 titstr='All detections';
@@ -121,6 +134,7 @@ for Idir=1:length(dir_names)
 
         create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
         if ~isempty(create_gif)
+            titstr=sprintf('%s_UMAP%idim.gif',dataset_chc,UMAP_dim);
             GIF_movie_demo(x(Itype,:),type(Itype),alpha_value,titstr,initial_azi,initial_el);
         end
 

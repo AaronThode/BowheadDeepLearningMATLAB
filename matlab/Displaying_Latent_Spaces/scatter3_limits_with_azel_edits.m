@@ -15,6 +15,7 @@ h.MarkerEdgeAlpha=alpha_value;
 h.MarkerFaceAlpha=alpha_value;
 xlabel('x');ylabel('y');zlabel('z');
 axis(ax,'equal')
+colorbar('location','south')
 %view(ax,[0 0]);
 
 % UI positions

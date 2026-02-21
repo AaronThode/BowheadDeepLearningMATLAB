@@ -9,7 +9,7 @@ function GIF_movie_demo(x,type,alpha_value,titstr,initial_azi,initial_el)
 %c = sqrt(X.^2+Y.^2+Z.^2);
 
 % Create figure and initial scatter3
-scale=2;
+scale=1;  %Size of plot
 fig = figure('Color','w','Position',[200 200 700/scale 600/scale]);
 ax = axes('Parent',fig);
 % ss(Idir,J)=scatter3(data.x_tsne(Itype,1), data.x_tsne(Itype,2), data.x_tsne(Itype,3), 3,type(Itype),'filled');
@@ -31,9 +31,9 @@ end
 colormap(jet)
 colorbar
 axis equal
-xlabel('UMAP Dimension 1');
-ylabel('UMAP Dimension 2');
-zlabel('UMAP Dimension 3');
+xlabel('Dimension 1');
+ylabel('Dimension 2');
+zlabel('Dimension 3');
 %title(titstr);
 
 % Lighting and view
@@ -49,7 +49,7 @@ nFrames = 120/2;         % number of frames in full rotation
 az0 = initial_azi;              % starting azimuth
 el =initial_el;               % elevation (fixed)
 outputGIF = true;      % set false to skip GIF creation
-gifName = 'rotating_scatter.gif';
+gifName = titstr;
 delayTime = 8*0.03;      % delay between frames in seconds
 
 % Preallocate capture
@@ -63,7 +63,7 @@ for k = 1:nFrames
     %view(ax, az, el)
 
     camorbit(360/nFrames,0)
-    %title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el))
+    title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el))
     drawnow
     frames(k) = getframe(fig);
     if outputGIF

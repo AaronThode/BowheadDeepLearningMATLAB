@@ -95,3 +95,4 @@ Pytorch_scripts/Bash/miniconda.sh
 # Exclude specific large installer
 Pytorch_scripts/Bash/miniconda.sh
 >>>>>>> OB-branch
+*.fig
