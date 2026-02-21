@@ -5,7 +5,7 @@ close all
 clear all
 
 dataset_chc='auto';
-UMAP_dim=5;   %Dimension of UMAP to load
+UMAP_dim=3;   %Dimension of UMAP to load
 
 %Database_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/TrainedModels.dir/';
 Database_dir='/Volumes/Bowhead_DL_Project/';
@@ -16,9 +16,9 @@ switch dataset_chc
             [Database_dir 'LD16/Autoencoder_v14_100E_16LD_32C_Manual_100K_Date20260122-190056.dir']};
 
         images_dir{1}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir';
-        images_dir{2}=images_dir{1};
+        %images_dir{2}=images_dir{1};
 
-        Nplots=2;
+        Ntypes=length(images_dir);
     case 'auto'
        % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
         dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
@@ -28,7 +28,7 @@ switch dataset_chc
         images_dir{1,2}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir';
         %images_dir{2}=images_dir{1,1};
 
-        Nplots=1;
+        Ntypes=1;
 end
 
 for Idir=1:length(dir_names)
@@ -39,6 +39,44 @@ for Idir=1:length(dir_names)
     field_want=sprintf('umap_embeddings_%id',UMAP_dim);
     x=data.(field_want);
 
+    %%If frequency information not available, load from SNR_gram
+    if ~isfield(data,'PeakFrequency')
+        Npp=size(data.latent_embeddings,1);
+        data.PeakFrequency=ones(Npp,1);
+        data.PeakTime=ones(Npp,1);
+        for II=1:Npp
+            if rem(II,100)==0,fprintf('%6.2f percent done\n', 100*II/Npp);end
+            fname=data.original_filenames{II};
+            if strcmp(dataset_chc,'manual')
+                imgdata=load(sprintf('%s%s%s',images_dir{Idir},filesep,fname));
+            else
+                if strcmp(fname(end-4),'0')
+                    imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fname));
+                else
+                    imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,fname));
+                end
+            end
+            FF=imgdata.dF*(0:size(imgdata.SNR_gram,1));
+            TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
+            tmp=max(imgdata.SNR_gram,[],2);
+            [~,Imax]=max(tmp);
+            data.PeakFrequency(II)=FF(Imax);
+
+            tmp=max(imgdata.SNR_gram,[],1);
+            [~,Imax]=max(tmp);
+            data.PeakTime(II)=TT(Imax);
+
+            % figure(101);
+            %  imagesc(TT,FF,imgdata.SNR_gram);%colorbar;
+            % ylim([0 300]);
+            % axis xy
+            % set(gca,'fontweight','bold','fontsize',14)
+            % title(sprintf('Peak Frequency: %6.2f Peak Time: %6.2f',data.PeakFrequency(II),data.PeakTime(II)));
+            % pause
+
+        end %%II
+        save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
+    end
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
@@ -66,7 +104,7 @@ for Idir=1:length(dir_names)
 
     figure(Idir)
 
-    for J=1:Nplots %%Split by call type
+    for J=1:Ntypes %%Split by call type
 
         switch dataset_chc
             case 'manual'
