@@ -16,7 +16,7 @@ switch dataset_chc
         dir_names={[Database_dir 'LD32/Autoencoder_v14_100E_32LD_32C_Manual_100K_Date20260122-190106.dir'], ...
             [Database_dir 'LD16/Autoencoder_v14_100E_16LD_32C_Manual_100K_Date20260122-190056.dir']};
 
-        images_dir{1}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir';
+        images_dir{1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
         %images_dir{2}=images_dir{1};
 
         Ntypes=length(images_dir);
@@ -25,8 +25,8 @@ switch dataset_chc
         dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
         %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_Auto_SNR+NTV_100K_Date20260212-085534.dir']};
 
-        images_dir{1,1}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir';
-        images_dir{1,2}='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir';
+        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
+        images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
         %images_dir{2}=images_dir{1,1};
 
         Ntypes=1;
