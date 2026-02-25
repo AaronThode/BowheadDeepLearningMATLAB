@@ -1,14 +1,15 @@
 %master_tSNE_3D_manual.m
 
 
-close all
+%close all
 clear all
+addpath ..
 
 dataset_chc='auto';
 UMAP_dim=3;   %Dimension of UMAP to load
+color_label='type';  %%How to label colors in 3D scattering.  'frequency' or 'type','PeakTime'
 
-%Database_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/TrainedModels.dir/';
-Database_dir='/Volumes/Bowhead_DL_Project/';
+[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 switch dataset_chc
 
     case 'manual'
@@ -35,7 +36,7 @@ for Idir=1:length(dir_names)
     disp(dir_names{Idir})
     mydir=pwd;
     cd([dir_names{Idir} filesep 'UMAP'])
-    data=load(sprintf('umap_embeddings_%id.mat',UMAP_dim));
+    data=load(sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc));
     field_want=sprintf('umap_embeddings_%id',UMAP_dim);
     x=data.(field_want);
 
@@ -75,7 +76,8 @@ for Idir=1:length(dir_names)
             % pause
 
         end %%II
-        save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
+        %save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
+        save(sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc),"-struct","data")
     end
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
@@ -124,6 +126,7 @@ for Idir=1:length(dir_names)
             case 'auto'
                 %type(type>0)=1;
                 Itype=1:length(type);
+                %Itype=find(type==0);
                 alpha_value=0.3;
                 titstr='All detections';
                 initial_azi=0;
@@ -132,12 +135,21 @@ for Idir=1:length(dir_names)
        % h(Idir,J)=subplot(1,2,J);
         x_norm=(x-mean(x))./std(x);
        
+        
+        switch color_label
+            case 'frequency'
+                x_color=data.PeakFrequency;
+            case 'PeakTime1'
+                x_color=data.PeakTime;
+            case 'type'
+                x_color=type;
+        end
         for K=1:2
             h(Idir,K)=subplot(1,2,K);
             if K==1
-                ss(Idir,K)=scatter3(x(Itype,1), x(Itype,2), x(Itype,3), 3,type(Itype),'filled');
+                ss(Idir,K)=scatter3(x(Itype,1), x(Itype,2), x(Itype,3), 3,x_color(Itype),'filled');
             else
-                ss(Idir,K)=scatter3(x_norm(Itype,1), x_norm(Itype,2), x_norm(Itype,3), 3,type(Itype),'filled');
+                ss(Idir,K)=scatter3(x_norm(Itype,1), x_norm(Itype,2), x_norm(Itype,3), 3,x_color(Itype),'filled');
 
             end
             ss(Idir,K).MarkerEdgeAlpha=alpha_value;
@@ -161,7 +173,7 @@ for Idir=1:length(dir_names)
         %hLink = linkprop(h(Idir,:), {'CameraPosition','CameraUpVector','CameraTarget'});
 
 
-        scatter3_limits_with_azel_edits(x_norm(Itype,:),type(Itype));
+        scatter3_limits_with_azel_edits(x_norm(Itype,:),x_color(Itype));
         colormap jet
       
         myfig=gcf;
@@ -172,8 +184,8 @@ for Idir=1:length(dir_names)
 
         create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
         if ~isempty(create_gif)
-            titstr=sprintf('%s_UMAP%idim.gif',dataset_chc,UMAP_dim);
-            GIF_movie_demo(x(Itype,:),type(Itype),alpha_value,titstr,initial_azi,initial_el);
+            titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
+            GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
         end
 
         

@@ -15,18 +15,22 @@ ax = axes('Parent',fig);
 % ss(Idir,J)=scatter3(data.x_tsne(Itype,1), data.x_tsne(Itype,2), data.x_tsne(Itype,3), 3,type(Itype),'filled');
 
 %%%Plot different symbols for different types
-str={'o','square','diamond'};
+% str={'o','square','diamond'};
+% types=unique(type);
+% for I=1:length(types)
+%     Itype=find(type==types(I));
+%     s{I} = scatter3(ax, x(Itype,1), x(Itype,2),x(Itype,3), 3, type(Itype),'filled');
+%     s{I}.MarkerEdgeAlpha=alpha_value;
+%     s{I}.MarkerFaceAlpha=alpha_value;
+%     s{I}.Marker=str{I};
+%     hold on
+% end
 
-types=unique(type);
-
-for I=1:length(types)
-    Itype=find(type==types(I));
-    s{I} = scatter3(ax, x(Itype,1), x(Itype,2),x(Itype,3), 3, type(Itype),'filled');
-    s{I}.MarkerEdgeAlpha=alpha_value;
-    s{I}.MarkerFaceAlpha=alpha_value;
-    s{I}.Marker=str{I};
+ s = scatter3(ax, x(:,1), x(:,2),x(:,3), 3, type,'filled');
+    s.MarkerEdgeAlpha=alpha_value;
+    s.MarkerFaceAlpha=alpha_value;
+    %s.Marker=str{I};
     hold on
-end
 
 colormap(jet)
 colorbar
