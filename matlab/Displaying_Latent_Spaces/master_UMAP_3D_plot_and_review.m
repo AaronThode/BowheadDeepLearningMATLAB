@@ -4,8 +4,9 @@
 %close all
 clear all
 addpath ..
+addpath .
 
-dataset_chc='auto';
+dataset_chc='manual';
 UMAP_dim=3;   %Dimension of UMAP to load
 color_label='type';  %%How to label colors in 3D scattering.  'frequency' or 'type','PeakTime'
 
@@ -41,7 +42,7 @@ for Idir=1:length(dir_names)
     x=data.(field_want);
 
     %%If frequency information not available, load from SNR_gram
-    if ~isfield(data,'PeakFrequency')
+    if ~isfield(data,'rms_bandwidth')
         Npp=size(data.latent_embeddings,1);
         data.PeakFrequency=ones(Npp,1);
         data.PeakTime=ones(Npp,1);
@@ -57,23 +58,11 @@ for Idir=1:length(dir_names)
                     imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,fname));
                 end
             end
-            FF=imgdata.dF*(0:size(imgdata.SNR_gram,1));
-            TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
-            tmp=max(imgdata.SNR_gram,[],2);
-            [~,Imax]=max(tmp);
-            data.PeakFrequency(II)=FF(Imax);
 
-            tmp=max(imgdata.SNR_gram,[],1);
-            [~,Imax]=max(tmp);
-            data.PeakTime(II)=TT(Imax);
+            [outputs]=extract_features_from_SNRgram(imgdata.dT,imgdata.dF,imgdata.SNR_gram);
+            data.PeakFrequency(II)=outputs.Fmax;
+            data.PeakTime(II)=outputs.Tmax;
 
-            % figure(101);
-            %  imagesc(TT,FF,imgdata.SNR_gram);%colorbar;
-            % ylim([0 300]);
-            % axis xy
-            % set(gca,'fontweight','bold','fontsize',14)
-            % title(sprintf('Peak Frequency: %6.2f Peak Time: %6.2f',data.PeakFrequency(II),data.PeakTime(II)));
-            % pause
 
         end %%II
         %save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");

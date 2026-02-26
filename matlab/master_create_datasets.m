@@ -397,7 +397,7 @@ for Iyear=1:length(year_want)
                         current_file_count=current_file_count+1;
                         dF=FF(2)-FF(1);dT=TT(2)-TT(1);
                         NTV_gram=VS_metrics{2};KEtoPE_gram=VS_metrics{3};Polar_gram=VS_metrics{4};
-                        save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram','dF','dT','bearing','tabs_mid');
+                        save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram','dF','dT','bearing','tabs_mid','param');
 
                         %database{Iyear,Isite,Id}.tabs=[]
 

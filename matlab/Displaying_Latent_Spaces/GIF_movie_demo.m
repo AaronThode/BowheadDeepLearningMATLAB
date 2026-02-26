@@ -67,7 +67,7 @@ for k = 1:nFrames
     %view(ax, az, el)
 
     camorbit(360/nFrames,0)
-    title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el))
+    title(sprintf('%s az: %6.2f el:%6.2f',titstr,az,el),'Interpreter','none');
     drawnow
     frames(k) = getframe(fig);
     if outputGIF
