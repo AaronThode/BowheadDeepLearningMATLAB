@@ -1,0 +1,13 @@
+SKIPPED FILES REPORT
+======================================================================
+
+Total files:        99,935
+Successfully loaded: 99,933
+Failed to load:     2
+
+FILES THAT FAILED TO LOAD:
+----------------------------------------------------------------------
+Index  49963: airgun_index.mat
+             Error: Missing 'SNR_gram' field
+Index  99934: airgun_index.mat
+             Error: Missing 'SNR_gram' field
