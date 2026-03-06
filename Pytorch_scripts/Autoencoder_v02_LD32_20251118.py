@@ -653,7 +653,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         if (epoch + 1) % 10 == 0:
             checkpoint_dir = os.path.join(output_dir, 'trained_model')
             os.makedirs(checkpoint_dir, exist_ok=True)
+<<<<<<< HEAD
             checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch{epoch+1}.pt')
+=======
+            checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch{epoch+1}.pth')
+>>>>>>> 6dc64fae532f9c9ea73d2cb7d2cf02b52fbcef65
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
@@ -671,7 +675,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     sys.stdout.flush()
     
     # Save model weights to trained_model subdirectory
+<<<<<<< HEAD
     model_path = os.path.join(output_dir, 'trained_model', 'autoencoder_clean.pt')
+=======
+    model_path = os.path.join(output_dir, 'trained_model', 'autoencoder_clean.pth')
+>>>>>>> 6dc64fae532f9c9ea73d2cb7d2cf02b52fbcef65
     torch.save(model.state_dict(), model_path)
     print(f"Saved model to: {model_path}")
     sys.stdout.flush()
@@ -679,7 +687,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     # Save model weights as MATLAB-compatible .mat file in MATLAB subdirectory
     mat_path = os.path.join(output_dir, 'MATLAB', 'autoencoder_clean.mat')
     state_dict = model.state_dict()
+<<<<<<< HEAD
     mat_dict = {key.replace('.', '_'): value.cpu().numpy() for key, value in state_dict.items()}
+=======
+    mat_dict = {key: value.cpu().numpy() for key, value in state_dict.items()}
+>>>>>>> 6dc64fae532f9c9ea73d2cb7d2cf02b52fbcef65
     savemat(mat_path, mat_dict)
     print(f"Saved model to MATLAB format: {mat_path}")
     sys.stdout.flush()
@@ -990,7 +1002,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         f"",
         f"Results:",
         f"  Final loss: {losses[-1]:.6f}",
+<<<<<<< HEAD
         f"  Model saved: autoencoder_clean.pt",
+=======
+        f"  Model saved: autoencoder_clean.pth",
+>>>>>>> 6dc64fae532f9c9ea73d2cb7d2cf02b52fbcef65
         f"  FRESH START: Model trained from random initialization",
     ]
     
