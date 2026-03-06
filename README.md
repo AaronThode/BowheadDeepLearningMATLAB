@@ -74,6 +74,14 @@ Training outputs, extracted features, and analysis results from model runs.
 ### `/Azigram_pulse_detector.dir/`
 Specialized scripts for detecting pulses in azimuthal spectrograms (azigrams), including weighted median calculations and master tracking routines.
 
+### `/OutreachProject/`
+Interactive browser-based tools for education and outreach:
+- **Whale Call Theremin** - Interactive Theremin-style synthesizer for playing back bowhead whale calls
+- Browser-based GUI with real-time frequency visualization
+- 7 call types with ~70,000 classified examples from the Beaufort Sea
+- Extracts frequency contours from spectrograms and synthesizes audio using Web Audio API
+- See [OutreachProject/README_WHALE_PLAYER.md](OutreachProject/README_WHALE_PLAYER.md) for usage instructions
+
 ## Workflow
 
 ### Data Preparation (MATLAB)
@@ -115,6 +123,8 @@ A virtual environment configuration is provided in `.venv_py31018/`.
 ## References
 
 Thode, A. M., Kim, K. H., Blackwell, S. B., Greene, C. R., Jr., Conrad, A. S., & Michael, A. (2012). Automated detection and localization of bowhead whale sounds in the presence of seismic airgun surveys. *The Journal of the Acoustical Society of America*, 131(5), 3726–3747. https://doi.org/10.1121/1.3699247
+
+Thode, A. M. (2025). Unsupervised clustering analysis of bowhead whale calls. *Technical Report*. Available at: https://github.com/AaronThode/BowheadDeepLearningMATLAB/blob/main/UnsupervisedClustering20250821.pdf
 
 ## Contact
 

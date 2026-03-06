@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# BFG Repo-Cleaner reports
+.bfg-report/
+
 # Python cache
 __pycache__/
 *.pyc
@@ -85,7 +88,14 @@ Pytorch_scripts/Archived_Scripts/
 !GSI_header_table.mat
 
 # PDFs and figures
-*.pdf
+*.Word documents
+*.docx
+ReadMe_whaleCallAnalysisOutputFiles.docx
+
+# Environment files
+environment.yml
+
+# pdf
 *.fig
 
 # Shell installers and large binaries
