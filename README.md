@@ -124,7 +124,7 @@ A virtual environment configuration is provided in `.venv_py31018/`.
 
 Thode, A. M., Kim, K. H., Blackwell, S. B., Greene, C. R., Jr., Conrad, A. S., & Michael, A. (2012). Automated detection and localization of bowhead whale sounds in the presence of seismic airgun surveys. *The Journal of the Acoustical Society of America*, 131(5), 3726–3747. https://doi.org/10.1121/1.3699247
 
-Thode, A. M. (2025). Unsupervised clustering analysis of bowhead whale calls. *Technical Report*. Available at: https://github.com/AaronThode/BowheadDeepLearningMATLAB/blob/main/UnsupervisedClustering20250821.pdf
+v0.01 Autoencoder architecture inspired by Duane, Daniel & Kroeger, Nicholas & Freeman, Simon & Freeman, Lauren. (2025). Unsupervised clustering of biological sounds in a Hawaiian coral reef. The Journal of the Acoustical Society of America. 157. A49-A49. 10.1121/10.0037353. 
 
 ## Contact
 
