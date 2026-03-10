@@ -8,7 +8,8 @@ addpath .
 
 dataset_chc='manual';
 UMAP_dim=3;   %Dimension of UMAP to load
-color_label='type';  %%How to label colors in 3D scattering.  'frequency' or 'type','PeakTime'
+color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
+advanced_labels=true;
 
 [Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 switch dataset_chc
@@ -42,7 +43,7 @@ for Idir=1:length(dir_names)
     x=data.(field_want);
 
     %%If frequency information not available, load from SNR_gram
-    if ~isfield(data,'rms_bandwidth')
+    if advanced_labels & ~isfield(data,'PeakFrequency')
         Npp=size(data.latent_embeddings,1);
         data.PeakFrequency=ones(Npp,1);
         data.PeakTime=ones(Npp,1);
@@ -105,6 +106,8 @@ for Idir=1:length(dir_names)
                 switch J
                     case 1
                         Itype=find(type<4);
+                        Itype=find(type<4 | type==7);
+                        
                         titstr='Upsweeps, downsweeps, and constant tones';
                         alpha_value=0.3;
                     case 2
@@ -113,7 +116,7 @@ for Idir=1:length(dir_names)
                         alpha_value=0.5;
                 end
             case 'auto'
-                %type(type>0)=1;
+                type(type>0)=1;
                 Itype=1:length(type);
                 %Itype=find(type==0);
                 alpha_value=0.3;
@@ -126,9 +129,9 @@ for Idir=1:length(dir_names)
        
         
         switch color_label
-            case 'frequency'
+            case 'PeakFrequency'
                 x_color=data.PeakFrequency;
-            case 'PeakTime1'
+            case 'PeakTime'
                 x_color=data.PeakTime;
             case 'type'
                 x_color=type;
@@ -223,7 +226,7 @@ for Idir=1:length(dir_names)
                 TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
 
                 imagesc(TT,FF,imgdata.SNR_gram);%colorbar;
-                ylim([0 300]);
+                ylim([0 500]);
                 axis xy
                 set(gca,'fontweight','bold','fontsize',14)
                 title(sprintf('%s,%s',temp_fnames{Iwant(JJ)}(1:22),temp_fnames{Iwant(JJ)}(end-4)),'FontSize',8);

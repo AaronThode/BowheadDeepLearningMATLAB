@@ -66,14 +66,14 @@ Site={'2','3','4','5'};  %What sites to process
 year_want={'08','10','12','14'};
 Site={'3'};
 
-year_want={'09'};
-Site={'3','5'};
+%year_want={'09'};
+%Site={'3','5'};
 
 %%%%%%%%%Other parameters useful for debugging%%%%%%%%%%%%
 
 max_files_per_directory=25000;  %%Maximum files allowed in an individual folder.  Lower numbers allow for easier manipulation using UNIX commands.
 param.spec.debug_plot=false;  %Plot spectrograms as we go along
-write_files=true;      %If true write the database
+write_files=false;      %If true write the database
 
 debug.Iday_start=1; %Set to one to process all days
 debug.Idasar_start=1;  %Set to one to process all DASARs
@@ -153,6 +153,7 @@ for Iyear=1:length(year_want)
             Manual_record_files_dir,filesep,year_want{Iyear},filesep,Site{Isite},year_want{Iyear},DASAR_strings);
 
         if ~exist(fname_mat,'file')  %%%Note we will use this only if DASAR_strings is the same as well
+            disp('Reprocessing manual archive...')
             [ind,localized]=read_tsv_archive(fname,ctmin,ctmax,DASAR_list);  %%Note that this only downloads the DASARs requested.
             save(fname_mat,'ind','localized');
             clear ind localized
@@ -179,14 +180,17 @@ for Iyear=1:length(year_want)
         %%%Sometimes the localized object is shorter than the ind
         %%%object.  So this is a safety check
         Itype=Itype(Itype<=size(manual.ind.wgt,1));
+
         for JJ=1:length(fieldnamess)
             manual.ind.(fieldnamess{JJ})=manual.ind.(fieldnamess{JJ})(Itype,:);
         end
         call_type_all=manual.localized.wctype;
         call_type_all=call_type_all(Itype);
 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%Start spectrogram creation loop for manual annotations
         %%%Loop through dates and create a selection file for each DASAR and day
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         for Id=debug.Idasar_start:length(DASAR_list)  %For each DASAR desired
             % Note that length(DASAR_list) and size(ind.ctime) should be
@@ -209,7 +213,6 @@ for Iyear=1:length(year_want)
             temp(:,4:6)=0;
             tabs_start=datenum(temp);
             tabs_start_unique=unique(tabs_start);  %%%The individual days present in the manual data for this DASAR/Site/year.
-
 
             %%%%%%%Download raw acoustic data%%%%%%%%%%%%%%
             if strcmpi(data_file_type,'gsi')
@@ -320,7 +323,6 @@ for Iyear=1:length(year_want)
                 tic
                 if strcmpi(data_file_type,'gsi')
                     if param.spec.compute_azimuth  %Read all channels
-
                         [x,~,head]=readgsi([dir_want filesep file_array{Ifile_want}],0,debug.sec_to_load,'native');
                         x=x';
                         param.spec.brefa=head.brefa;

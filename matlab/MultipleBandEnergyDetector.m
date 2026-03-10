@@ -60,10 +60,10 @@
 %        detect.fmax(count)=max(fhi(tend~=0));
 %        detect.dB_RMS(count): dB re 1uPa amplitude RMS of signal
 %                    (10*log10(sum(10.^(temp(1:2:end)/10),1)))
-%           detect.duration=(detect.tend-detect.tstart);
+%        detect.duration=(detect.tend-detect.tstart);
 %        detect.tstart_abs=tabs_start+datenum(0,0,0,0,0,detect.tstart);
-%          detect.tend_abs=tabs_start+datenum(0,0,0,0,0,detect.tend);
-%     debug.detector:  sum across spectrogram PSD bandwidth
+%        detect.tend_abs=tabs_start+datenum(0,0,0,0,0,detect.tend);
+%        debug.detector:  sum across spectrogram PSD bandwidth
        
 function [detect,debug]=MultipleBandEnergyDetector(x,tabs_start,params)
 
@@ -335,7 +335,6 @@ debug.TT=TT;
 for I=1:length(fieldnames)
     detect.(fieldnames{I})=detect.(fieldnames{I})(1:count);
 end
-
 
 
 if params.debug
