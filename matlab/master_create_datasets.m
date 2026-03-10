@@ -27,13 +27,13 @@ warning off
 %%%Computer specific information
 [~,hostname]=system('hostname');
 if contains(hostname,'macmussel-2')
-    GSI_file_dir='/Volumes/Shared-2/Data/';
+    GSI_file_dir='/Volumes/Shared/Data/';
     code_dir='/Users/thode/Projects/DeepLearningNPRBProject/Software/matlab';
     WAV_file_dir='/Volumes/Bowhead4/';
     Manual_record_files_dir='../../Shell_Manual_Results';
 
 else
-    GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
+    %GSI_file_dir='/Volumes/Bowhead4/Shell_AllChannel_Demo/';
     GSI_file_dir='/Volumes/Shared/Data/';
     code_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software/matlab';
     WAV_file_dir='/Volumes/Bowhead4/';
@@ -55,6 +55,7 @@ param.event.fmin = 25; %Hz
 param.event.fmax = 500; %Hz
 sound_type='whale'; %whale or seal or 'all_biologics': for filtering manual results
 DASAR_strings='ADG';  %%What DASARs to sample data from.  Can be non-contiguous order: 'ACG';
+DASAR_strings='G';  %%What DASARs to sample data from.  Can be non-contiguous order: 'ACG';
 
 %Event detector fundamental parameters
 param.event.dB_threshold = 5; % dB threshold above mean for detection.  Higher value means fewer events selected.
@@ -66,8 +67,8 @@ Site={'2','3','4','5'};  %What sites to process
 year_want={'08','10','12','14'};
 Site={'3'};
 
-%year_want={'09'};
-%Site={'3','5'};
+year_want={'08'};
+Site={'5'};
 
 %%%%%%%%%Other parameters useful for debugging%%%%%%%%%%%%
 
@@ -263,6 +264,7 @@ for Iyear=1:length(year_want)
 
             %%%For each unique day for this DASAR/Site/year, create
             %%%database folder hierarchy.
+            %%%    Cycle through day
             for Iday=debug.Iday_start:length(tabs_start_unique)
                 disp(datestr(tabs_start_unique(Iday)));
                 cd(mydir)

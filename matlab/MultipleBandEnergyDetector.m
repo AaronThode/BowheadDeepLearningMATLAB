@@ -1,4 +1,7 @@
 %%%%MultipleBandEnergyDetector.m
+%  Aaron Thode
+%  Revised 10 May 2026 to allow timing of peak power across frequency to be
+%   flagged.
 % function [detect,debug]=MultipleBandEnergyDetector(x,tabs_start,params)
 %
 %%%  Given a time series x and a series of band parameters,
@@ -67,6 +70,13 @@
        
 function [detect,debug]=MultipleBandEnergyDetector(x,tabs_start,params)
 
+
+%Define constants for easier understanding
+STATE.OFF=-2;
+STATE.POSSIBLE_ON=1;
+STATE.ON=2;
+STATE.POSSIBLE_OFF=-1;
+
 isdB=true;
 if isfield(params,'EqFormat')
   if ~contains(params.EqFormat,'dB')
@@ -133,14 +143,16 @@ Imax_time=round(params.MaxTime/dT);
 
 %%% Create equalization and detection functions
 if isdB  %JINGLONG
-    for I=1:length(Iflo)
-        band.eq(I)=10*log10(dF*sum(10.^(eq(Iflo(I):Ifhi(I))/10)));
-        debug.detect(I,:)=10*log10(dF*sum(10.^(B(Iflo(I):Ifhi(I),:)/10),1));  %Equal to dB RMS of transient
+    debug.detect=zeros(length(Iflo),size(B,2));
+    for Icol=1:length(Iflo)
+        band.eq(Icol)=10*log10(dF*sum(10.^(eq(Iflo(Icol):Ifhi(Icol))/10)));
+        debug.detect(Icol,:)=10*log10(dF*sum(10.^(B(Iflo(Icol):Ifhi(Icol),:)/10),1));  %Equal to dB RMS of transient
     end
+    debug.peak_power=10*log10(dF*sum(10.^(B(Iflo(1):Ifhi(end),:)/10),1));
 else
-    for I=1:length(Iflo)
-        band.eq(I)=dF*sum(eq(Iflo(I):Ifhi(I)));
-        debug.detect(I,:)=dF*sum(B(Iflo(I):Ifhi(I),:),1);
+    for Icol=1:length(Iflo)
+        band.eq(Icol)=dF*sum(eq(Iflo(Icol):Ifhi(Icol)));
+        debug.detect(Icol,:)=dF*sum(B(Iflo(Icol):Ifhi(Icol),:),1);
     end
     
 end
@@ -153,9 +165,9 @@ end
 
 %%Initialize detector.
 count_estimate=round(10*length(x)/params.Fs);  %Assume around 10 detections/second
-fieldnames={'tstart','tend','duration','dB_RMS','fmin','fmax'};
-for I=1:length(fieldnames)
-    detect.(fieldnames{I})=zeros(count_estimate,1);
+fieldnames={'tstart','tend','duration','dB_RMS','fmin','fmax','magnitude','tpeak'};
+for Icol=1:length(fieldnames)
+    detect.(fieldnames{Icol})=zeros(count_estimate,1);
 end
 
 count=0;
@@ -163,14 +175,15 @@ count=0;
 %%%detection_status reports status of each frequency band.  It is important
 % to have more states than just 'on' or 'off'.  No enum type in MATLAB
 
-detection_status=-2*ones(Ndet,1);  %-2: off; -1: possible off 1: possible on  2: on
+
+
+detection_status=STATE.OFF*ones(Ndet,1);  %-2: off; -1: possible off 1: possible on  2: on
 active_detectors=0;
 tend=zeros(Ndet,1);
 tstart=zeros(Ndet,1);
 magnitude=tstart;
-peak_index=tstart;
 
-tstart_total=0;tend_total=0;
+tstart_total=0;tend_total=0;magnitude_all=0;peak_index=0;
 write_flag=false;
 
 if size(band.eq,2)>1
@@ -178,109 +191,132 @@ if size(band.eq,2)>1
 end
 debug.eq_history(Ndet,1:Iburn)=0;
 debug.eq_history(:,1:Iburn)=repmat(band.eq,1,Iburn);
-debug.detection_status(:,1:Iburn)=-2*ones(Ndet,Iburn);
+debug.detection_status(:,1:Iburn)=STATE.OFF*ones(Ndet,Iburn);
 
 
 %%Cycle through detector.
-%%  Written as for loop to make it easy
-for I=((1+Iburn):Ncol)  %For every column of spectrogram (or incoming FFT)
+%%% Written as for loop to make it easy
+for Icol=((1+Iburn):Ncol)  %For every column of spectrogram (or incoming FFT)
     global_reset=false;
-    val=debug.detect(:,I);  %Slice of frequency-summed spectrogram (dB rms)
-    for J=1:Ndet  %For each detector
+    val=debug.detect(:,Icol);  %Slice of frequency-summed spectrogram (dB rms)
+    %sum_val=sum(val);
+    for Jdetect=1:Ndet  %For each detector
         if write_flag||global_reset %Detection has offically ended, cycle thorugh rest of detectors quickly
             continue
         end
         
         if isdB  %JINGLONG
-            criteria=band.eq(J)+threshold;
+            criteria=band.eq(Jdetect)+threshold;
         else
-            criteria=band.eq(J).*threshold;
+            criteria=band.eq(Jdetect).*threshold;
         end
-        if val(J)>=criteria  %threshold exceeded
-            switch detection_status(J)
-                case -2 %OFF
-                    detection_status(J)=1; %POSSIBLE ON
-                    tstart(J)=I;
-                    tend(J)=I;
-                case 1 %POSSIBLEON
-                    if (I-tstart(J))>=Imin_time  %Is the detection long enough to track
-                        detection_status(J)=2;
+        if val(Jdetect)>=criteria  %threshold exceeded
+            % STATE.OFF=-2;
+            % STATE.POSSIBLE_ON=1;
+            % STATE.ON=2;
+            % STATE.POSSIBLE_OFF=-1;
+            switch detection_status(Jdetect)
+                case STATE.OFF %OFF
+                    detection_status(Jdetect)=STATE.POSSIBLE_ON; %POSSIBLE ON
+                    tstart(Jdetect)=Icol;
+                    tend(Jdetect)=Icol;
+                case STATE.POSSIBLE_ON %POSSIBLEON
+                    if (Icol-tstart(Jdetect))>=Imin_time  %Is the detection long enough to track
+                        detection_status(Jdetect)=STATE.ON;
                         active_detectors=active_detectors+1;
-                        magnitude(J)=val(J);  %dB rms
-                        peak_index(J)=I;
-                        if active_detectors==1
-                            tstart_total=I;
+                        magnitude(Jdetect)=val(Jdetect);  %dB rms
+                        if  debug.peak_power(Icol)>magnitude_all
+                            peak_index=Icol;
+                            magnitude_all=debug.peak_power(Icol);
+                            
+                        end
+                        if active_detectors==1  %%If detection officially starts, include possible on
+                            %tstart_total=Icol;  %Changed this 10 Mar 2026
+                            tstart_total=tstart(Jdetect);
                         end
                     end
                     
-                case 2 %ON
-                    magnitude(J)=max([magnitude(J) val(J)]);
-                    if magnitude(J)==val(J)
-                        peak_index(J)=I;
+                case STATE.ON %ON
+                    magnitude(Jdetect)=max([magnitude(Jdetect) val(Jdetect)]);
+
+                    if  debug.peak_power(Icol)>magnitude_all
+                        peak_index=Icol;
+                        magnitude_all=debug.peak_power(Icol);
+                        
                     end
-                    
-                    %%%Force reset?
-                    if I-tstart_total>=Imax_time
+
+                    %%%Force reset if detection going on too long.
+                    if Icol-tstart_total>=Imax_time
+                        disp('too long')
                         active_detectors=0;
-                        tend(J)=I;
-                        tend_total=tend(J);
+                        tend(Jdetect)=Icol;
+                        tend_total=tend(Jdetect);
                         write_flag=true;
                         if ~global_reset
                             for KK=1:Ndet
-                                detection_status(KK)=-2;
+                                detection_status(KK)=STATE.OFF;
                                 if isdB  %JINGLONG
                                     band.eq(KK)=(1-0.25)*val(KK)+0.25*band.eq(KK);
                                 else
-                                    band.eq(KK)=(band.eq(J).^0.25).*(val(J).^.75); %Update background estimate
+                                    band.eq(KK)=(band.eq(Jdetect).^0.25).*(val(Jdetect).^.75); %Update background estimate
                                     
                                 end
-                                debug.eq_history(J,I)=band.eq(J);
-                                tend(KK)=I;
+                                debug.eq_history(Jdetect,Icol)=band.eq(Jdetect);
+                                tend(KK)=Icol;
                                 %writeMe(KK)=true;
                             end
                             global_reset=true;
                         end
                         
                         
-                    end %Imax_time
+                    end % if Imax_time
                     
-                case -1 %POSSIBLE OFF: we have just dipped below threshold for less than EndTolerance time, take back
-                    detection_status(J)=2;
-                    tend(J)=I;
+                case STATE.POSSIBLE_OFF %POSSIBLE OFF: we have just dipped below threshold for less than EndTolerance time, take back
+                    detection_status(Jdetect)=STATE.ON;
+                    tend(Jdetect)=Icol;
+                    if  debug.peak_power(Icol)>magnitude_all
+                        peak_index=Icol;
+                        magnitude_all=debug.peak_power(Icol);
+                        
+                    end
             end
         else  %threshold not obtained
             
-            switch detection_status(J)
-                case -2 %OFF
+            switch detection_status(Jdetect)
+                case STATE.OFF %OFF
                     if isdB
-                        band.eq(J)=(alpha).*band.eq(J)+(1-alpha)*val(J); %Update background estimate
+                        band.eq(Jdetect)=(alpha).*band.eq(Jdetect)+(1-alpha)*val(Jdetect); %Update background estimate
                     else
-                        band.eq(J)=(band.eq(J).^alpha).*(val(J).^(1-alpha)); %Update background estimate
+                        band.eq(Jdetect)=(band.eq(Jdetect).^alpha).*(val(Jdetect).^(1-alpha)); %Update background estimate
                         
                     end
-                case 2 %ON
-                    tend(J)=I;  %%Mark end of detection
-                    detection_status(J)=-1; %Possible OFF
-                case 1 %POSSIBLE ON:  We have briefly crossed threshold but have dipped back below
-                    detection_status(J)=-2;
-                    tstart(J)=0;
-                    tend(J)=0;
-                case -1 %POSSIBLE OFF
-                   % if isdB
-                    %    band.eq(J)=(alpha).*band.eq(J)+(1-alpha)*val(J); %Update background estimate
-                    %else
-                    %    band.eq(J)=(band.eq(J).^alpha).*(val(J).^(1-alpha)); %Update background estimate
+                case STATE.ON %ON
+                    tend(Jdetect)=Icol;  %%Mark end of detection
+                    detection_status(Jdetect)=STATE.POSSIBLE_OFF; %Possible OFF
+                    if  debug.peak_power(Icol)>magnitude_all
+                        peak_index=Icol;
+                        magnitude_all=debug.peak_power(Icol);
                         
-                   % end
-                    if tend(J)+Itol_time<=I&&(tend(J)~=0)  %%%if enough time has passed since last detection
-                        detection_status(J)=-2;
+                    end
+                case STATE.POSSIBLE_ON %POSSIBLE ON:  We have briefly crossed threshold but have dipped back below
+                    detection_status(Jdetect)=STATE.OFF;
+                    tstart(Jdetect)=0;
+                    tend(Jdetect)=0;
+                    %magnitude_all=0;
+                    %peak_index=0;
+                case STATE.POSSIBLE_OFF %POSSIBLE OFF
+                  
+                    if tend(Jdetect)+Itol_time<=Icol&&(tend(Jdetect)~=0)  %%%if enough time has passed since last detection
+                        detection_status(Jdetect)=STATE.OFF;
                         active_detectors=active_detectors-1;
                         %writeMe(J)=true;
                         if active_detectors==0
-                            if Imin_time+Itol_time<=(tend(J)-tstart_total)
-                                tend_total=tend(J);
+                            if Imin_time+Itol_time<=(tend(Jdetect)-tstart_total)
+                                tend_total=tend(Jdetect);
                                 write_flag=true;
+                                global_reset=true;
                             else
+                                disp('Too short')
                                 reset_detect;  %detection is too short
                             end
                         end
@@ -290,9 +326,11 @@ for I=((1+Iburn):Ncol)  %For every column of spectrogram (or incoming FFT)
             
         end %if threshold
         
-    end %J loop through detectors.
-    debug.eq_history(:,I)=band.eq;
-    debug.detection_status(:,I)=detection_status;
+    end %Jdetect loop through detectors.
+
+
+    debug.eq_history(:,Icol)=band.eq;
+    debug.detection_status(:,Icol)=detection_status;
     %%%We've now worked through all bands.  Create or close
     %%%  an official detection.
     
@@ -303,6 +341,7 @@ for I=((1+Iburn):Ncol)  %For every column of spectrogram (or incoming FFT)
         detect.tend(count)=tend_total;
         detect.fmin(count)=min(flo(tend~=0));
         detect.fmax(count)=max(fhi(tend~=0));
+        detect.tpeak(count)=peak_index;
         
         if isdB  %JINGLONG
             temp=magnitude(tend~=0);
@@ -311,16 +350,12 @@ for I=((1+Iburn):Ncol)  %For every column of spectrogram (or incoming FFT)
         else
         end
         
-        %detect.duration(count)=tstart_total-tend_total;
-        %detection_status(:)=false;
         write_flag=false;
         reset_detect;
         
-        
     end %write flag
     
-    
-end  %I-loop through time
+end  %Icol-loop through time
 
 %%%Convert times into seconds
 %detect.tstart=0.5*params.Nfft/params.Fs-dT+dT*detect.tstart;
@@ -328,12 +363,13 @@ end  %I-loop through time
 
 detect.tstart=TT(detect.tstart(detect.tstart>0))';
 detect.tend=TT(detect.tend(detect.tend>0))';
+detect.tpeak=TT(detect.tpeak(detect.tpeak>0))';
 
 detect.duration=detect.tend-detect.tstart;
 debug.TT=TT;
 
-for I=1:length(fieldnames)
-    detect.(fieldnames{I})=detect.(fieldnames{I})(1:count);
+for Icol=1:length(fieldnames)
+    detect.(fieldnames{Icol})=detect.(fieldnames{Icol})(1:count);
 end
 
 
@@ -349,12 +385,12 @@ if params.debug
     %caxis([min(min(debug.detect)) max(max(debug.detect))]);
     subplot(4,1,2);hold off
     imagesc(TT,0.5*(flo+fhi),(debug.detect));axis('xy'); colorbar('westoutside')
-    caxis([min(min(debug.detect)) max(max(debug.detect))]);
+    clim([min(min(debug.detect)) max(max(debug.detect))]);
     title('Detection function');
     
     subplot(4,1,3);hold off
     imagesc(TT,0.5*(flo+fhi),(debug.detect-debug.eq_history));axis('xy'); colorbar('westoutside')
-    caxis([params.threshold + [0 30]]);
+    clim([params.threshold + [0 30]]);
     title('Detection Excess');colormap(jet)
     
     subplot(4,1,4);hold off
@@ -364,17 +400,20 @@ if params.debug
     
     hold on
     ylimm=ylim;
-    for I=1:count
-        line([detect.tstart(I) detect.tend(I)],ylimm(2)*[1 1],'color','r','linewidth',3);
-        line(mean([detect.tstart(I) detect.tend(I)])*[1 1],ylimm,'color','r','linewidth',3);
+    for Icol=1:count
+        line([detect.tstart(Icol) detect.tend(Icol)],detect.fmin(Icol)*[1 1],'color','g','linewidth',2);
+        line([detect.tstart(Icol) detect.tend(Icol)],detect.fmax(Icol)*[1 1],'color','g','linewidth',2);
+        
+        line(detect.tpeak(Icol)*[1 1],ylimm,'color','g','linewidth',2);
     end
     linkaxes
     
-end
+end %if params.debug
 
 %%%Convert times to absolute times
 detect.tstart_abs=tabs_start+datenum(0,0,0,0,0,detect.tstart);
 detect.tend_abs=tabs_start+datenum(0,0,0,0,0,detect.tend);
+detect.tpeak_abs=tabs_start+datenum(0,0,0,0,0,detect.tpeak);
 debug.flo=flo;
 debug.fhi=fhi;
 
@@ -384,13 +423,16 @@ debug.fhi=fhi;
         tend_total=0;
         tstart_total=0;
         write_flag=false;
+        magnitude_all=0;   
+        peak_index=0;
+
         for KKK=1:Ndet
             magnitude(KKK)=0;
-            peak_index(KKK)=0;
+            %peak_index(KKK)=0;
             tstart(KKK)=0;
             tend(KKK)=0;
-            detection_status(KKK)=-2;
-            %writeMe(KKK)=false;
+            detection_status(KKK)=STATE.OFF;
+            
             
         end
     end
