@@ -55,7 +55,7 @@ param.event.fmin = 25; %Hz
 param.event.fmax = 500; %Hz
 sound_type='whale'; %whale or seal or 'all_biologics': for filtering manual results
 DASAR_strings='ADG';  %%What DASARs to sample data from.  Can be non-contiguous order: 'ACG';
-DASAR_strings='G';  %%What DASARs to sample data from.  Can be non-contiguous order: 'ACG';
+%DASAR_strings='G';  %%What DASARs to sample data from.  Can be non-contiguous order: 'ACG';
 
 %Event detector fundamental parameters
 param.event.dB_threshold = 5; % dB threshold above mean for detection.  Higher value means fewer events selected.
@@ -74,7 +74,7 @@ Site={'5'};
 
 max_files_per_directory=25000;  %%Maximum files allowed in an individual folder.  Lower numbers allow for easier manipulation using UNIX commands.
 param.spec.debug_plot=false;  %Plot spectrograms as we go along
-write_files=false;      %If true write the database
+write_files=true;      %If true write the database
 
 debug.Iday_start=1; %Set to one to process all days
 debug.Idasar_start=1;  %Set to one to process all DASARs
@@ -426,6 +426,11 @@ for Iyear=1:length(year_want)
                         end
 
                         [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                        [temp]=extract_features_from_SNRgram(TT(2)-TT(1),FF(2)-FF(1),SNR_gram);
+                        PeakFrequency=temp.Fmax;
+                        PeakTime=temp.Tmax;
+
+                        
                         if  param.spec.debug_plot & mytype>0
                             Iman=Manual_index(II,1);
                             fprintf('Call %i of %i, Type %i, Score %6.2f\n',Iman,length(manual.tend),mytype,Score{Ichunk}(II,1));
@@ -439,9 +444,10 @@ for Iyear=1:length(year_want)
                             pause;
                             close
                         end
-                         %pause;  %Uncomment when viewing all detections,not just whales
-                          %  close
-   
+                        %pause;  %Uncomment when viewing all detections,not just whales
+                        %
+                        % close
+
                         if isempty(SNR_gram)
                             continue
                         end
@@ -472,7 +478,8 @@ for Iyear=1:length(year_want)
                             current_file_count=current_file_count+1;
                             dF=FF(2)-FF(1);dT=TT(2)-TT(1);
                             NTV_gram=VS_metrics{2};KEtoPE_gram=VS_metrics{3};Polar_gram=VS_metrics{4};
-                            save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram','dF','dT','bearing','tabs_tstartt');
+                            save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram', ...
+                                'dF','dT','bearing','tabs_tstartt','PeakFrequency','PeakTime');
 
                         end
                     end %Idet

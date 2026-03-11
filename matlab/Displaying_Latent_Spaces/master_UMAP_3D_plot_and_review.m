@@ -68,7 +68,7 @@ for Idir=1:length(dir_names)
         end %%II
         %save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
         save(sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc),"-struct","data")
-    end
+    end  %Advanced labels
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
