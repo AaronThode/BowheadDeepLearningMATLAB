@@ -35,11 +35,12 @@ eval(sprintf('!mkdir %s/Trash.dir',database_folder));
 %%%  Note that each year/site combination may cover different days.
 year_want={'08','09','10','11','12','13','14'};
 Site={'2','3','4','5'};
+DASAR_strings='ABCDEFG';  %%No real harm if not all of these exists
 
 year_want={'08','10','12','14'};
 Site={'3','5'};
+DASAR_strings='ADG';  %%No real harm if not all of these exists
 
-DASAR_strings='ABCDEFG';  %%No real harm if not all of htese exists
 folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
 SNR_gram_dims=[121 104];  %%%Dimensions expected to ensure consistentcy of data fed into autoencoder.
 
@@ -120,7 +121,8 @@ for Iyear=1:length(year_want)
                         end
                         index{Iyear,Isite,Iday,Ifold,Idd}.fname(Ifile,:)=fnames(Ifile).name;
                         index{Iyear,Isite,Iday,Ifold,Idd}.bearing(Ifile)=temp.bearing;
-                        index{Iyear,Isite,Iday,Ifold,Idd}.tabs(Ifile)=temp.tabs_mid;
+                        %index{Iyear,Isite,Iday,Ifold,Idd}.tabs(Ifile)=temp.tabs_mid;
+                        index{Iyear,Isite,Iday,Ifold,Idd}.tabs(Ifile)=temp.tabs_tstartt;
                     end
 
                     %%%Remove bad files from index variable

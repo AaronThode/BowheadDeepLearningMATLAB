@@ -21,14 +21,12 @@ close all
 clear
 addpath .
 warning off
-!rm diary_output.txt
-%diary diary_output.txt
 
 %%%Computer specific information
 [~,hostname]=system('hostname');
-if contains(hostname,'macmussel-2')
-    GSI_file_dir='/Volumes/Shared/Data/';
-    code_dir='/Users/thode/Projects/DeepLearningNPRBProject/Software/matlab';
+if contains(hostname,'ishmael')
+    GSI_file_dir='/Volumes/Shared-2/Data/';
+    code_dir='/Users/thode/Desktop/DeepLearningBowhead/Software_repo/matlab';
     WAV_file_dir='/Volumes/Bowhead4/';
     Manual_record_files_dir='../../Shell_Manual_Results';
 
@@ -41,6 +39,9 @@ else
 
 end
 cd(code_dir)
+
+!rm diary_output.txt
+diary diary_output.txt
 
 
 data_file_type='GSI'; %'GSI' or 'WAV' for raw audio data source
@@ -65,10 +66,10 @@ year_want={'08','09','10','11','12','13','14'};  %What years to process
 Site={'2','3','4','5'};  %What sites to process
 
 year_want={'08','10','12','14'};
-Site={'3'};
-
-year_want={'08'};
 Site={'5'};
+
+%year_want={'08'};
+%Site={'5'};
 
 %%%%%%%%%Other parameters useful for debugging%%%%%%%%%%%%
 
@@ -269,6 +270,13 @@ for Iyear=1:length(year_want)
                 disp(datestr(tabs_start_unique(Iday)));
                 cd(mydir)
 
+                Ithis_day=find(tabs_start==tabs_start_unique(Iday));
+                fprintf('On this day there are %i manual detections.\n',length(Ithis_day));
+               
+                if length(Ithis_day)<3
+                    disp('Not going to process this day as no manual detections \n');
+                    continue
+                end
                 %%%Create directory structures and count files in current
                 %%%directory
                 %if Iday==debug.Iday_start && Id==debug.Idasar_start
@@ -282,8 +290,6 @@ for Iyear=1:length(year_want)
                 cd(sprintf('Day_%s',datestr(tabs_start_unique(Iday),30)));
 
 
-                %!mkdir Bowhead_calls.dir
-                %!mkdir Other_sounds.dir
                 !mkdir Manually_selected_bowhead_calls.dir
                 !mkdir Manually_selected_bowhead_calls.dir/D1.dir
 
@@ -291,15 +297,17 @@ for Iyear=1:length(year_want)
                 !mkdir Event_sounds.dir/D1.dir
 
 
-                cd('Manually_selected_bowhead_calls.dir/D1.dir')
-                current_save_dir=pwd;
-                current_file_count=length(dir('*mat'));
+                cd('Event_sounds.dir/D1.dir')
+                current_save_dir{1}=pwd;
+                current_file_count(1)=length(dir('*mat'));
+                cd ../..
 
+                cd('Manually_selected_bowhead_calls.dir/D1.dir')
+                current_save_dir{2}=pwd;
+                current_file_count(2)=length(dir('*mat'));
 
                 %%%Create a 'manual' variable that stored info about
                 %%%detections for this specific day
-                Ithis_day=find(tabs_start==tabs_start_unique(Iday));
-                fprintf('On this day there are %i manual detections.\n',length(Ithis_day));
                 manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
                 Ithis_day=Ithis_day(manual.tsec<debug.sec_to_load); %%In case only loaded part of file
                 manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
@@ -419,13 +427,22 @@ for Iyear=1:length(year_want)
                         %%%Identify if a whale call
                         if(~isnan(Score{Ichunk}(II,1)))
                             mytype=manual.call_type(Manual_index(II,1));
-                            param.spec.debug_plot=true;
+                            Idir=2;
+                            param.spec.debug_plot=false;
                         else
+                            Idir=1;
                             mytype=0;
                             param.spec.debug_plot=false;
                         end
 
                         [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
+                        
+                        %%%Sometimes file length not right
+                        if isempty(SNR_gram)
+                            continue
+                        end
+
+                        %%%Extract peak frequency and time%%%
                         [temp]=extract_features_from_SNRgram(TT(2)-TT(1),FF(2)-FF(1),SNR_gram);
                         PeakFrequency=temp.Fmax;
                         PeakTime=temp.Tmax;
@@ -454,6 +471,7 @@ for Iyear=1:length(year_want)
                         if write_files
                             output_name=file_array{Ifile_want}(1:(end-4));
                             tabs_tstartt=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid-detect.tstart(II));
+                            tabs_tmid=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid);
                             temp=datestr(tabs_tstartt,30);
                             output_name(17:end)=temp(10:end);
 
@@ -464,21 +482,23 @@ for Iyear=1:length(year_want)
                             %%%Save spectrograms to current subdirectory and
                             %%%start a new subdirectory if too many files in
                             %%%current one.
-                            while current_file_count>=max_files_per_directory
-                                Idump=str2double(current_save_dir(end-4));
-                                current_save_dir(end-4)=int2str(Idump+1);
-                                if ~exist(current_save_dir,'dir')
-                                    eval(sprintf('!mkdir %s',current_save_dir))
+                 
+                            
+                            while current_file_count(Idir)>=max_files_per_directory
+                                Idump=str2double(current_save_dir{Idir}(end-4));
+                                current_save_dir{Idir}(end-4)=int2str(Idump+1);
+                                if ~exist(current_save_dir{Idir},'dir')
+                                    eval(sprintf('!mkdir %s',current_save_dir{Idir}))
                                 end
-                                cd(current_save_dir);
-                                fprintf('Changing to %s\n',current_save_dir);
-                                current_file_count=length(dir('*.mat'));
+                                cd(current_save_dir{Idir});
+                                fprintf('Changing to %s\n',current_save_dir{Idir});
+                                current_file_count(Idir)=length(dir('*.mat'));
 
                             end
-                            current_file_count=current_file_count+1;
+                            current_file_count(Idir)=current_file_count(Idir)+1;
                             dF=FF(2)-FF(1);dT=TT(2)-TT(1);
                             NTV_gram=VS_metrics{2};KEtoPE_gram=VS_metrics{3};Polar_gram=VS_metrics{4};
-                            save(output_name,'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram', ...
+                            save([current_save_dir{Idir} filesep output_name],'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram', ...
                                 'dF','dT','bearing','tabs_tstartt','PeakFrequency','PeakTime');
 
                         end
@@ -559,11 +579,11 @@ for Iyear=1:length(year_want)
 %                 disp('Finished  spectrograms')
 
                 %%%Update current file count in current subdirectory
-                if write_files
-                    cd ../../Event_sounds.dir/D1.dir
-                    current_save_dir=pwd;
-                    current_file_count=length(dir('*mat'));
-                end
+               % if write_files
+                %    cd ../../Event_sounds.dir/D1.dir
+                %    current_save_dir=pwd;
+                %    current_file_count=length(dir('*mat'));
+                %end
 
                
             end %Iday
