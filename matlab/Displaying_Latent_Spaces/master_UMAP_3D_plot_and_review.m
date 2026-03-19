@@ -6,9 +6,9 @@ clear all
 addpath ..
 addpath .
 
-dataset_chc='auto';
+dataset_chc='manual';
 UMAP_dim=3;   %Dimension of UMAP to load
-color_label='PeakTime';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
+color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
 advanced_labels=true;
 
 [Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;

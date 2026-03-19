@@ -167,7 +167,7 @@ if size(y,2)>1
 
 
 
-else
+else  %Just a spectrogram please
     [B,F,T] = spectrogram(y(:,1),param.Nfft,round(param.ovlap*param.Nfft),param.Nfft,Fs);
     Ifreq=(F>=param.fmin & F<=param.fmax);
     B=10*log10(abs(B(Ifreq,:)));
