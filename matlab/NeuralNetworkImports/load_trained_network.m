@@ -38,7 +38,7 @@ net_autoencoder = initialize(net_autoencoder);
 
 %%%Create 32-element decoder network
 tempNet = [
-    inputLayer([Nlatent 1 1],"SSC","Name","input")
+    inputLayer([Nlatent 1 1 1],"SSCB","Name","input") %The 'C' is channel and 'B' stands for batch and is needed for bulk processing
     %networkLayer(params.TopLevelModule_encoder.Network,"Name",'TopLevelModule:encoder',"OutputNames",{'11'})
     %networkLayer(params.TopLevelModule_flatten.Network,"Name",'TopLevelModule:flatten',"OutputNames",{'Flatten0'})
     %networkLayer(params.TopLevelModule_to_latent.Network,"Name",'TopLevelModule:to_latent',"OutputNames",{'2'})
