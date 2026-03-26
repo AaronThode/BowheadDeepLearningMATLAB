@@ -24,10 +24,8 @@ end
 
 [output_images] = minibatchpredict(net_autoencoder,input_images);
 [latent_vectors] = minibatchpredict(net_autoencoder,input_images,'Outputs','TopLevelModule:to_latent');
-%temp=zeros(32,1,1,Nsamples,'single');
-%for I=1:Nsamples
-%    temp(:,1,1,I)=latent_vectors(I,:);
-%end
+
+
 temp=reshape(latent_vectors',size(latent_vectors,2),1,1,Nsamples);
 output_image_decoder=minibatchpredict(net_decoder,temp);
 
