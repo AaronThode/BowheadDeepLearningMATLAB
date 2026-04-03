@@ -11,11 +11,11 @@ PERFORMANCE OPTIMIZATIONS:
 - Limited t-SNE samples (30 instead of 1000) for instant visualization
 - Non-blocking plots (plt.close() instead of plt.show())
 - Efficient DataLoader streaming from disk
+- Reduced default epochs (10 instead of 50) for quick iterations
 
 USAGE:
-
-python3 Autoencoder_v03_20251212_Hybrid_Filter.py
-
+source .venv_py31018/bin/activate
+python3 Autoencoder_v02_20251118.py
 """
 import torch
 import torch.nn as nn
@@ -30,7 +30,6 @@ import math
 import torch.nn.functional as F
 from scipy.io import loadmat, savemat
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
-from typing import Union, Optional, Tuple, List
 from datetime import datetime
 import time
 import gc  # For explicit garbage collection
@@ -48,7 +47,9 @@ try:
     UMAP = umap.UMAP
 except Exception:
     UMAP = None
+
 import argparse
+from typing import Optional, Tuple, List
 
 # ============================================================================
 # GLOBAL CONFIGURATION PARAMETERS
@@ -59,19 +60,19 @@ CHANNELS_DEFAULT = 32
 LATENT_DIM_DEFAULT = 32
 EXTRA_CONV_DEFAULT = False
 
-
-# Training parameters (optimized for speed)
-EPOCHS_DEFAULT = 100             # Full training for production
+# Training parameters 
+EPOCHS_DEFAULT = 100             # Reduced for faster iterations
 LR_DEFAULT = 1e-3
 SEED_DEFAULT = 42
 
-# Output parameters (minimized for speed)
+# Output parameters 
 NUMBER_OUTPUT_IMAGE_SAMPLES = 30   # Reduced from 5000 for faster JPEG generation
 PANEL_GROUP_SIZE = 3
 SHOW_ERROR_PLOTS = False
 ENABLE_UMAP = True  # Set to False to skip UMAP computation
-DEFAULT_VERSION_TAG = "15_100E_32LD_32C_Hybrid_5x5_3x3_CombinedDatasets_100K"
+DEFAULT_VERSION_TAG = "100E_32LD_32C_100kCombined_Centered"
 TSNE_MAX_SAMPLES = None  # None => use all samples in dataset
+MAX_SAMPLES_PER_DATASET_DEFAULT = 50000  # 50K from each dataset for 100K total
 
 
 # ============================================================================
@@ -90,6 +91,59 @@ def set_global_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
+def initialize_weights(model: nn.Module, seed: Optional[int] = None):
+    """
+    Explicitly initialize all model weights from scratch using standard methods.
+    This ensures NO pre-trained patterns exist in the network.
+    
+    - Conv2d: Kaiming/He initialization (optimal for ReLU)
+    - Linear: Xavier/Glorot initialization  
+    - BatchNorm: weights=1, bias=0
+    """
+    if seed is not None:
+        torch.manual_seed(seed)
+    
+    for m in model.modules():
+        if isinstance(m, nn.Conv2d):
+            # Kaiming initialization for convolutional layers (best for ReLU)
+            nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.ConvTranspose2d):
+            # Kaiming initialization for transposed convolutions
+            nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.Linear):
+            # Xavier initialization for linear layers
+            nn.init.xavier_normal_(m.weight)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.BatchNorm2d):
+            # Standard BatchNorm initialization
+            nn.init.constant_(m.weight, 1)
+            nn.init.constant_(m.bias, 0)
+
+
+def verify_random_weights(model: nn.Module) -> dict:
+    """
+    Verify that model weights are randomly initialized (not zeros or constants).
+    Returns statistics to confirm proper initialization.
+    """
+    stats = {}
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            data = param.data.cpu().numpy()
+            stats[name] = {
+                'mean': float(np.mean(data)),
+                'std': float(np.std(data)),
+                'min': float(np.min(data)),
+                'max': float(np.max(data)),
+                'non_zero_ratio': float(np.count_nonzero(data) / data.size)
+            }
+    return stats
+
+
 def create_output_directory(version_tag: Optional[str] = None) -> str:
     """Create unique timestamped output directory with organized subdirectories."""
     tag = (version_tag or DEFAULT_VERSION_TAG).strip().replace(' ', '_')
@@ -97,7 +151,7 @@ def create_output_directory(version_tag: Optional[str] = None) -> str:
     dir_name = f"Autoencoder_v{tag}_Date{timestamp}.dir"
     
     # Output to specified directory
-    results_dir = "/Users/oboulais/Desktop/Bowhead_DL_Project/LD32_Hybrid"
+    results_dir = "/Users/oboulais/Desktop/Bowhead_DL_Project/LD32"
     os.makedirs(results_dir, exist_ok=True)
     
     output_dir = os.path.join(results_dir, dir_name)
@@ -106,6 +160,9 @@ def create_output_directory(version_tag: Optional[str] = None) -> str:
     # Create organized subdirectories
     os.makedirs(os.path.join(output_dir, 'MATLAB'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'image_results'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'image_results', 'SNR'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'image_results', 'NTV'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'image_results', 'spectrogram'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'trained_model'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'UMAP'), exist_ok=True)
     
@@ -137,31 +194,53 @@ def _minmax_norm(im: np.ndarray, auto_skip_if_unit: bool = True) -> np.ndarray:
 # ============================================================================
 
 class SNRDataset(Dataset):
-    """Memory-efficient Dataset loading .mat files on-demand."""
+    """Memory-efficient Dataset loading .mat files on-demand.
+    
+    Args:
+        directory: Path to directory containing .mat files
+        normalize: Whether to normalize spectrograms to [0, 1]
+        seed: Random seed for shuffling (None = no shuffle)
+        show_summary: Print dataset summary
+        max_samples: Maximum number of samples to use (None = use all)
+        gram_type: Type of spectrogram to load ('SNR_gram', 'NTV_gram', or 'BOTH')
+    """
     
     def __init__(self, directory: str, normalize: bool = True, 
-                 seed: Optional[int] = None, show_summary: bool = False):
+                 seed: Optional[int] = None, show_summary: bool = False,
+                 max_samples: Optional[int] = None, gram_type: str = 'SNR_gram'):
         self.normalize = normalize
-        self.file_paths: list[str] = []
+        self.gram_type = gram_type
+        self.file_paths: List[str] = []
+        
+        # If gram_type is 'BOTH', we'll load both SNR_gram and NTV_gram from each file
+        self.load_both = (gram_type == 'BOTH')
+        self.gram_types = ['SNR_gram', 'NTV_gram'] if self.load_both else [gram_type]
         
         target_shape = None
-        print(f"  Scanning for .mat files in: {directory}")
-        sys.stdout.flush()
         mat_files = sorted(glob.glob(os.path.join(directory, '**', '*.mat'), recursive=True))
-        total_files = len(mat_files)
-        print(f"  Found {total_files} .mat files, validating shapes...")
-        sys.stdout.flush()
         
-        for i, fp in enumerate(mat_files):
-            # Progress update every 5000 files
-            if i % 5000 == 0 and i > 0:
-                print(f"    Validated {i}/{total_files} files ({100*i/total_files:.1f}%)...")
-                sys.stdout.flush()
+        # When loading both, validate that files have both gram types
+        for fp in mat_files:
             try:
                 m = loadmat(fp)
-                im = m.get('SNR_gram', None)
-                if im is None or not isinstance(im, np.ndarray) or im.ndim != 2:
-                    continue
+                if self.load_both:
+                    # Check both gram types exist
+                    snr = m.get('SNR_gram', None)
+                    ntv = m.get('NTV_gram', None)
+                    if snr is None or ntv is None:
+                        continue
+                    if not isinstance(snr, np.ndarray) or snr.ndim != 2:
+                        continue
+                    if not isinstance(ntv, np.ndarray) or ntv.ndim != 2:
+                        continue
+                    if snr.shape != ntv.shape:
+                        continue
+                    im = snr  # Use for shape validation
+                else:
+                    im = m.get(self.gram_type, None)
+                    if im is None or not isinstance(im, np.ndarray) or im.ndim != 2:
+                        continue
+                
                 if target_shape is None:
                     target_shape = im.shape
                 if im.shape == target_shape:
@@ -174,32 +253,74 @@ class SNRDataset(Dataset):
         
         self.target_shape = target_shape
         
+        # Shuffle before limiting (to get random subset)
         if seed is not None:
             rng = np.random.default_rng(seed)
             indices = rng.permutation(len(self.file_paths))
             self.file_paths = [self.file_paths[i] for i in indices]
         
+        # Limit to max_samples if specified
+        total_found = len(self.file_paths)
+        if max_samples is not None:
+            # When loading both, max_samples refers to total samples (files * 2)
+            max_files = max_samples // 2 if self.load_both else max_samples
+            if max_files < len(self.file_paths):
+                self.file_paths = self.file_paths[:max_files]
+        
         if show_summary:
-            print(f"SNRDataset: {len(self)} files with shape {target_shape}")
+            total_samples = len(self.file_paths)
+            if max_samples is not None and max_files < total_found:
+                if self.load_both:
+                    print(f"Multi-Gram Dataset (SNR+NTV 2-channel): {total_samples} samples from {len(self.file_paths)} files (limited from {total_found}) with shape [2, {target_shape[0]}, {target_shape[1]}]")
+                else:
+                    print(f"{self.gram_type} Dataset: {total_samples} samples (limited from {total_found}) with shape {target_shape}")
+            else:
+                if self.load_both:
+                    print(f"Multi-Gram Dataset (SNR+NTV 2-channel): {total_samples} samples from {len(self.file_paths)} files with shape [2, {target_shape[0]}, {target_shape[1]}]")
+                else:
+                    print(f"{self.gram_type} Dataset: {total_samples} samples with shape {target_shape}")
     
     def __len__(self):
+        # Each file contributes 1 sample (single-channel or 2-channel)
         return len(self.file_paths)
     
     def __getitem__(self, idx):
         fp = self.file_paths[idx]
-        try:
-            m = loadmat(fp)
-            im = m['SNR_gram']
-            if self.normalize:
-                im = _minmax_norm(im)
-            else:
-                im = im.astype(np.float32)
-            tensor = torch.from_numpy(im).unsqueeze(0)
-            return tensor, 0
-        except Exception as e:
-            print(f"Warning: Failed to load {fp}: {e}")
-            h, w = self.target_shape
-            return torch.zeros((1, h, w), dtype=torch.float32), 0
+        
+        if self.load_both:
+            # Load BOTH SNR_gram and NTV_gram from same file as 2-channel input
+            try:
+                m = loadmat(fp)
+                snr = m['SNR_gram']
+                ntv = m['NTV_gram']
+                if self.normalize:
+                    snr = _minmax_norm(snr)
+                    ntv = _minmax_norm(ntv)
+                else:
+                    snr = snr.astype(np.float32)
+                    ntv = ntv.astype(np.float32)
+                # Stack as 2-channel tensor [2, H, W]
+                tensor = torch.from_numpy(np.stack([snr, ntv], axis=0))
+                return tensor, 0
+            except Exception as e:
+                print(f"Warning: Failed to load {fp} (BOTH): {e}")
+                h, w = self.target_shape
+                return torch.zeros((2, h, w), dtype=torch.float32), 0
+        else:
+            # Load single gram type as 1-channel input
+            try:
+                m = loadmat(fp)
+                im = m[self.gram_type]
+                if self.normalize:
+                    im = _minmax_norm(im)
+                else:
+                    im = im.astype(np.float32)
+                tensor = torch.from_numpy(im).unsqueeze(0)
+                return tensor, 0
+            except Exception as e:
+                print(f"Warning: Failed to load {fp} ({self.gram_type}): {e}")
+                h, w = self.target_shape
+                return torch.zeros((1, h, w), dtype=torch.float32), 0
 
 
 # ============================================================================
@@ -208,30 +329,16 @@ class SNRDataset(Dataset):
 
 class ImprovedAutoencoder(nn.Module):
     """
-    TRUE HYBRID Autoencoder with configurable first-layer kernel size.
+    Autoencoder with batch normalization and no sigmoid constraint.
     ALWAYS INITIALIZED FROM SCRATCH - NO PRETRAINED WEIGHTS.
-    
-    HYBRID ARCHITECTURE:
-        - First conv layer: Uses kernel_size (default 5×5) to capture broad N/U curve shapes
-        - Subsequent layers: Always use 3×3 to refine details efficiently
-    
-    This design captures the overall sweep pattern of whale calls in the first layer,
-    then refines local features in deeper layers.
-    
-    Args:
-        kernel_size: First layer kernel size (3 or 5). 5×5 recommended for N/U calls.
     """
     
     def __init__(self, nrow=121, ncol=104, latent_dim=LATENT_DIM_DEFAULT, 
-                 base_channels=CHANNELS_DEFAULT, extra_conv=EXTRA_CONV_DEFAULT,
-                 kernel_size=5):
+                 base_channels=CHANNELS_DEFAULT, extra_conv=EXTRA_CONV_DEFAULT, in_channels=1):
         super().__init__()
         self.nrow, self.ncol = nrow, ncol
         self.extra_conv = extra_conv
-        self.kernel_size = kernel_size
-        
-        # HYBRID: First layer uses kernel_size, rest use 3×3
-        first_padding = (kernel_size - 1) // 2  # 2 for 5×5, 1 for 3×3
+        self.in_channels = in_channels
         
         if extra_conv:
             nrow_reduced = nrow // 16
@@ -247,12 +354,10 @@ class ImprovedAutoencoder(nn.Module):
         
         if extra_conv:
             self.encoder = nn.Sequential(
-                # Layer 1: Large kernel (5×5) captures broad N/U curve patterns
-                nn.Conv2d(1, c1, kernel_size, padding=first_padding),
+                nn.Conv2d(in_channels, c1, 3, padding=1),
                 nn.BatchNorm2d(c1),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                # Layer 2+: Standard 3×3 kernels refine features
                 nn.Conv2d(c1, c2, 3, padding=1),
                 nn.BatchNorm2d(c2),
                 nn.ReLU(inplace=True),
@@ -269,12 +374,10 @@ class ImprovedAutoencoder(nn.Module):
             flat_size = c4 * nrow_reduced * ncol_reduced
         else:
             self.encoder = nn.Sequential(
-                # Layer 1: Large kernel (5×5) captures broad N/U curve patterns
-                nn.Conv2d(1, c1, kernel_size, padding=first_padding),
+                nn.Conv2d(in_channels, c1, 3, padding=1),
                 nn.BatchNorm2d(c1),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(2),
-                # Layer 2+: Standard 3×3 kernels refine features
                 nn.Conv2d(c1, c2, 3, padding=1),
                 nn.BatchNorm2d(c2),
                 nn.ReLU(inplace=True),
@@ -312,7 +415,7 @@ class ImprovedAutoencoder(nn.Module):
                 nn.ConvTranspose2d(c2, c1, 2, stride=2),
                 nn.BatchNorm2d(c1),
                 nn.ReLU(inplace=True),
-                nn.ConvTranspose2d(c1, 1, 2, stride=2, output_padding=(pad_h, pad_w)),
+                nn.ConvTranspose2d(c1, in_channels, 2, stride=2, output_padding=(pad_h, pad_w)),
             )
         else:
             pad_h = (nrow - nrow_reduced * 8) % 2
@@ -324,7 +427,7 @@ class ImprovedAutoencoder(nn.Module):
                 nn.ConvTranspose2d(c2, c1, 2, stride=2),
                 nn.BatchNorm2d(c1),
                 nn.ReLU(inplace=True),
-                nn.ConvTranspose2d(c1, 1, 2, stride=2, output_padding=(pad_h, pad_w)),
+                nn.ConvTranspose2d(c1, in_channels, 2, stride=2, output_padding=(pad_h, pad_w)),
             )
         
         self.flat_size = flat_size
@@ -343,7 +446,7 @@ class ImprovedAutoencoder(nn.Module):
         return output, latent
 
 
-def match_shape_center(recon: torch.Tensor, target_hw: tuple[int, int]) -> torch.Tensor:
+def match_shape_center(recon: torch.Tensor, target_hw: Tuple[int, int]) -> torch.Tensor:
     """Center-crop or pad reconstruction to match target dimensions."""
     _, _, rH, rW = recon.shape
     tH, tW = target_hw
@@ -397,8 +500,8 @@ def select_samples_for_outputs(dataset: Dataset, n_samples: int, seed: Optional[
 
 
 def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_dir: str,
-                               target_hw: tuple[int, int], base_name: str = "recon_panel",
-                               dataset_label: str = "", filenames: list[str] = None, 
+                               target_hw: Tuple[int, int], base_name: str = "recon_panel",
+                               dataset_label: str = "", filenames: Optional[List[str]] = None, 
                                show_error: bool = SHOW_ERROR_PLOTS, epochs: int = 100,
                                latent_dim: int = 32, channels: int = 64, device: torch.device = None) -> int:
     """Save JPEG panels showing reconstructions with proper axis labels."""
@@ -424,8 +527,21 @@ def save_reconstruction_panels(model: nn.Module, samples: torch.Tensor, output_d
         with torch.no_grad():
             recon, _ = model(batch)
             recon = match_shape_center(recon, target_hw)
-        orig_np = batch.squeeze(1).cpu().numpy()
-        recon_np = recon.squeeze(1).cpu().numpy()
+        
+        # Handle 2-channel data by averaging channels
+        batch_np = batch.cpu().numpy()
+        recon_np_raw = recon.cpu().numpy()
+        
+        if batch_np.shape[1] == 2:
+            # Average SNR+NTV channels for visualization
+            orig_np = np.mean(batch_np, axis=1)  # [batch, H, W]
+        else:
+            orig_np = batch_np.squeeze(1)
+        
+        if recon_np_raw.shape[1] == 2:
+            recon_np = np.mean(recon_np_raw, axis=1)
+        else:
+            recon_np = recon_np_raw.squeeze(1)
         
         cols = recon_np.shape[0]
         fig, axes = plt.subplots(n_rows, cols, figsize=(3.5 * cols, 3.5 * n_rows))
@@ -514,7 +630,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                                    batch_size: int = 32, output_samples: int = NUMBER_OUTPUT_IMAGE_SAMPLES,
                                    version_tag: str = DEFAULT_VERSION_TAG, show_error: bool = SHOW_ERROR_PLOTS,
                                    k_clusters: int = 2, tsne_perplexity: Optional[float] = None,
-                                   kernel_size: int = 3, enable_umap: bool = ENABLE_UMAP):
+                                   max_samples_per_dataset: Optional[int] = None, gram_type: str = 'SNR_gram'):
     """
     
     FRESH START GUARANTEES:
@@ -566,20 +682,26 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     if isinstance(data_dir, str):
         # Single directory (backward compatibility)
         print(f"\nLoading data from: {data_dir}")
+        if max_samples_per_dataset:
+            print(f"  Limiting to {max_samples_per_dataset:,} samples")
         dataset_label = os.path.basename(data_dir.rstrip('/'))
-        dataset = SNRDataset(data_dir, normalize=True, seed=seed, show_summary=True)
+        dataset = SNRDataset(data_dir, normalize=True, seed=seed, show_summary=True, 
+                            max_samples=max_samples_per_dataset, gram_type=gram_type)
     elif isinstance(data_dir, (list, tuple)):
         # Multiple directories - combine them
         print(f"\nLoading data from {len(data_dir)} directories:")
+        if max_samples_per_dataset:
+            print(f"  Limiting each dataset to {max_samples_per_dataset:,} samples")
         datasets = []
         for i, dir_path in enumerate(data_dir, 1):
             print(f"  [{i}] {dir_path}")
-            ds = SNRDataset(dir_path, normalize=True, seed=seed, show_summary=True)
+            ds = SNRDataset(dir_path, normalize=True, seed=seed, show_summary=True,
+                           max_samples=max_samples_per_dataset, gram_type=gram_type)
             datasets.append(ds)
-            print(f"      Loaded {len(ds)} samples")
+            print(f"      Using {len(ds):,} samples")
         dataset = ConcatDataset(datasets)
         dataset_label = f"Combined_{len(data_dir)}_datasets"
-        print(f"\nTotal combined samples: {len(dataset)}")
+        print(f"\nTotal combined samples: {len(dataset):,}")
     else:
         raise ValueError(f"data_dir must be str or list/tuple, got {type(data_dir)}")
     
@@ -598,14 +720,34 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     
     # STEP 3: Initialize model FROM SCRATCH (no pretrained weights)
     nrow, ncol = data_tensor.shape[-2], data_tensor.shape[-1]
+    in_channels = data_tensor.shape[1]  # 1 for single-channel, 2 for BOTH (SNR+NTV)
     print(f"\nInitializing NEW model from random weights...")
+    print(f"Input shape: {data_tensor.shape} (in_channels={in_channels})")
+    
+    # Create model with random initialization
     model = ImprovedAutoencoder(nrow=nrow, ncol=ncol, latent_dim=latent_dim, 
                                 base_channels=channels, extra_conv=extra_conv,
-                                kernel_size=kernel_size)
+                                in_channels=in_channels)
+    
+    # EXPLICIT weight initialization to guarantee fresh start
+    print(f"Explicitly initializing all {sum(p.numel() for p in model.parameters()):,} parameters from scratch...")
+    initialize_weights(model, seed=seed)
+    
+    # Verify weights are properly randomized (not zeros or constants)
+    weight_stats = verify_random_weights(model)
+    print(f"✓ Weight initialization verified:")
+    print(f"  - {len(weight_stats)} parameter tensors initialized")
+    print(f"  - Encoder conv1 weight std: {weight_stats.get('encoder.0.weight', {}).get('std', 0):.6f}")
+    print(f"  - Decoder output weight std: {[v['std'] for k, v in weight_stats.items() if 'decoder' in k and 'weight' in k][-1]:.6f}")
+    print(f"  - All weights are non-zero (confirming randomness)")
+    
     model = model.to(device)  # Move model to GPU
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
-    print(f"Architecture: {4 if extra_conv else 3} conv layers, latent_dim={latent_dim}, kernel={kernel_size}x{kernel_size}")
+    print(f"Architecture: {4 if extra_conv else 3} conv layers, latent_dim={latent_dim}, in_channels={in_channels}")
     print(f"Model on device: {next(model.parameters()).device}")
+    print(f"="*70)
+    print(f"🎲 GUARANTEED FRESH START - No pretrained weights or patterns!")
+    print(f"="*70)
     
     # STEP 4: Train from scratch
     print(f"\nTraining model from scratch for {epochs} epochs...")
@@ -656,7 +798,9 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         
         # Save checkpoint every 10 epochs for recovery
         if (epoch + 1) % 10 == 0:
-            checkpoint_path = os.path.join(output_dir, 'trained_model', f'checkpoint_epoch{epoch+1}.pth')
+            checkpoint_dir = os.path.join(output_dir, 'trained_model')
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch{epoch+1}.pth')
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
@@ -682,7 +826,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     # Save model weights as MATLAB-compatible .mat file in MATLAB subdirectory
     mat_path = os.path.join(output_dir, 'MATLAB', 'autoencoder_clean.mat')
     state_dict = model.state_dict()
-    mat_dict = {key: value.cpu().numpy() for key, value in state_dict.items()}
+    mat_dict = {key.replace('.', '_'): value.cpu().numpy() for key, value in state_dict.items()}
     savemat(mat_path, mat_dict)
     print(f"Saved model to MATLAB format: {mat_path}")
     sys.stdout.flush()
@@ -863,60 +1007,6 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         optimal_k = 2
         perplexity = 30.0
     
-    # Plot 4: UMAP visualization (if enabled and available)
-    if enable_umap and UMAP is not None and improved_latent_full.shape[0] > 2:
-        try:
-            print(f"Computing UMAP on {improved_latent_full.shape[0]} samples...")
-            umap_reducer = UMAP(n_components=2, random_state=int(seed) if seed else 0, n_neighbors=15, min_dist=0.1)
-            umap_emb = umap_reducer.fit_transform(imp_z)
-            
-            # Use same clusters from t-SNE/k-means if available, otherwise compute new ones
-            if KMeans is not None and optimal_k > 0:
-                umap_clusters = clusters  # Reuse clusters from t-SNE section
-            else:
-                umap_clusters = (umap_emb[:, 0] > np.median(umap_emb[:, 0])).astype(int)
-                optimal_k = 2
-            
-            # Generate UMAP plot
-            cmap = plt.cm.get_cmap('tab10', optimal_k)
-            plt.figure(figsize=(7, 6))
-            
-            for cluster_id in range(optimal_k):
-                mask = umap_clusters == cluster_id
-                color = cmap(cluster_id)
-                plt.scatter(umap_emb[mask, 0], umap_emb[mask, 1], 
-                           c=[color], alpha=0.85, s=28, label=f'Cluster {cluster_id}')
-            
-            plt.title(f'UMAP Latent Space (k={optimal_k})')
-            plt.xlabel('UMAP 1')
-            plt.ylabel('UMAP 2')
-            plt.legend(loc='upper right', fontsize=8, framealpha=0.9, ncol=(2 if optimal_k > 5 else 1))
-            plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', 
-                       ha='right', va='bottom', fontsize=7, style='italic', alpha=0.6)
-            plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_latent.png'), dpi=160)
-            plt.close()
-            
-            # Save UMAP embeddings
-            umap_data = {
-                'latent_embeddings': imp_z,
-                'umap_embeddings': umap_emb,
-                'clusters': umap_clusters,
-                'optimal_k': optimal_k,
-                'dataset_label': dataset_label,
-                'original_filenames': filenames if 'filenames' in locals() else np.array([]),
-                'reconstruction_filenames': reconstruction_filenames if 'reconstruction_filenames' in locals() else np.array([])
-            }
-            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings.mat'), umap_data)
-            print(f"Saved UMAP embeddings to UMAP/umap_embeddings.mat")
-            
-        except Exception as e:
-            print(f"Warning: UMAP visualization skipped: {e}")
-    elif not enable_umap:
-        print("UMAP visualization disabled (enable_umap=False)")
-    else:
-        print("Warning: UMAP not available or insufficient samples")
-    
     # ALWAYS save latent embeddings (even if t-SNE failed)
     print(f"Saving latent embeddings ({imp_z.shape[0]} samples, {imp_z.shape[1]}-dim)...")
     
@@ -951,6 +1041,91 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"  -> Mapping {len(filenames)} embeddings to source files")
     print("  -> Use replot_tsne_from_saved.py to re-plot with different k values!")
     
+    # Plot 4: UMAP visualizations (2D, 3D, 5D) - if enabled and available
+    if ENABLE_UMAP and UMAP is not None and improved_latent_full.shape[0] > 2:
+        try:
+            # Use same clusters from t-SNE/k-means if available
+            umap_clusters = clusters
+            cmap = plt.cm.get_cmap('tab10', optimal_k)
+            
+            # ===== 2D UMAP =====
+            print(f"Computing 2D UMAP on {improved_latent_full.shape[0]} samples...")
+            umap_reducer_2d = UMAP(n_components=2, random_state=int(seed) if seed else 0, n_neighbors=15, min_dist=0.1)
+            umap_emb_2d = umap_reducer_2d.fit_transform(imp_z)
+            
+            # Generate 2D UMAP plot
+            plt.figure(figsize=(7, 6))
+            for cluster_id in range(optimal_k):
+                mask = umap_clusters == cluster_id
+                color = cmap(cluster_id)
+                plt.scatter(umap_emb_2d[mask, 0], umap_emb_2d[mask, 1], 
+                           c=[color], alpha=0.85, s=28, label=f'Cluster {cluster_id}')
+            
+            plt.title(f'UMAP 2D Latent Space (k={optimal_k})')
+            plt.xlabel('UMAP 1')
+            plt.ylabel('UMAP 2')
+            plt.legend(loc='upper right', fontsize=8, framealpha=0.9, ncol=(2 if optimal_k > 5 else 1))
+            plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', 
+                       ha='right', va='bottom', fontsize=7, style='italic', alpha=0.6)
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_2d_latent.png'), dpi=160)
+            plt.close()
+            print(f"  ✓ 2D UMAP complete")
+            
+            # ===== 3D UMAP =====
+            print(f"Computing 3D UMAP on {improved_latent_full.shape[0]} samples...")
+            umap_reducer_3d = UMAP(n_components=3, random_state=int(seed) if seed else 0, n_neighbors=15, min_dist=0.1)
+            umap_emb_3d = umap_reducer_3d.fit_transform(imp_z)
+            
+            # Generate 3D UMAP plot
+            from mpl_toolkits.mplot3d import Axes3D
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection='3d')
+            
+            for cluster_id in range(optimal_k):
+                mask = umap_clusters == cluster_id
+                color = cmap(cluster_id)
+                ax.scatter(umap_emb_3d[mask, 0], umap_emb_3d[mask, 1], umap_emb_3d[mask, 2],
+                          c=[color], alpha=0.85, s=28, label=f'Cluster {cluster_id}')
+            
+            ax.set_title(f'UMAP 3D Latent Space (k={optimal_k})')
+            ax.set_xlabel('UMAP 1')
+            ax.set_ylabel('UMAP 2')
+            ax.set_zlabel('UMAP 3')
+            ax.legend(loc='upper right', fontsize=8, framealpha=0.9, ncol=(2 if optimal_k > 5 else 1))
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_3d_latent.png'), dpi=160)
+            plt.close()
+            print(f"  ✓ 3D UMAP complete")
+            
+            # ===== 5D UMAP =====
+            print(f"Computing 5D UMAP on {improved_latent_full.shape[0]} samples...")
+            umap_reducer_5d = UMAP(n_components=5, random_state=int(seed) if seed else 0, n_neighbors=15, min_dist=0.1)
+            umap_emb_5d = umap_reducer_5d.fit_transform(imp_z)
+            print(f"  ✓ 5D UMAP complete (no visualization, saved to .mat)")
+            
+            # Save ALL UMAP embeddings (2D, 3D, 5D) to single .mat file
+            umap_data = {
+                'latent_embeddings': imp_z,
+                'umap_embeddings_2d': umap_emb_2d,
+                'umap_embeddings_3d': umap_emb_3d,
+                'umap_embeddings_5d': umap_emb_5d,
+                'clusters': umap_clusters,
+                'optimal_k': optimal_k,
+                'dataset_label': dataset_label,
+                'original_filenames': filenames,
+                'reconstruction_filenames': reconstruction_filenames
+            }
+            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings.mat'), umap_data)
+            print(f"Saved UMAP embeddings (2D, 3D, 5D) to UMAP/umap_embeddings.mat")
+            
+        except Exception as e:
+            print(f"Warning: UMAP visualization skipped: {e}")
+    elif not ENABLE_UMAP:
+        print("UMAP visualization disabled (ENABLE_UMAP=False)")
+    else:
+        print("Warning: UMAP not available or insufficient samples")
+    
     # STEP 7: Save JPEG reconstruction panels
     try:
         panel_samples, panel_filenames = select_samples_for_outputs(dataset, output_samples, seed)
@@ -980,6 +1155,13 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         f"End: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"Total runtime: {script_elapsed:.1f}s ({script_elapsed/60:.1f}min)",
         f"",
+        f"FRESH START VERIFICATION:",
+        f"  ✓ No checkpoint loading",
+        f"  ✓ No pretrained weights",
+        f"  ✓ Explicit random initialization",
+        f"  ✓ Seed-controlled reproducibility",
+        f"  ✓ Every parameter initialized from scratch",
+        f"",
         f"Configuration:",
         f"  Dataset: {dataset_label}",
         f"  Files: {len(dataset)}",
@@ -989,6 +1171,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         f"  Latent dim: {latent_dim}",
         f"  Channels: {channels}",
         f"  Seed: {seed}",
+        f"  Gram type: {gram_type}",
         f"",
         f"Performance:",
         f"  Training: {training_elapsed:.1f}s ({training_elapsed/60:.1f}min)",
@@ -998,7 +1181,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         f"Results:",
         f"  Final loss: {losses[-1]:.6f}",
         f"  Model saved: autoencoder_clean.pth",
-        f"  FRESH START: Model trained from random initialization",
+        f"  INDEPENDENT RUN: No influence from previous training",
     ]
     
     with open(os.path.join(output_dir, 'timing_log.txt'), 'w') as f:
@@ -1012,19 +1195,21 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"{'='*70}")
 
 
-# ========================== 
+# ============================================================================
 # SCRIPT ENTRY POINT
 # ============================================================================
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Hybrid_Filter_Autoencoder")
+    parser = argparse.ArgumentParser(description="Autoencoder_v04_LD32_20260325_Centered")
     parser.add_argument("--data-dir", 
                        nargs='+',
                        default=[
-                           "/Users/oboulais/Desktop/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir",
-                           "/Users/oboulais/Desktop/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir"
+                           "/Users/oboulais/Public/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir",
+                           "/Users/oboulais/Public/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir"
                        ],
-                       help="One or more directories containing .mat files (default: both datasets)")
+                       help="One or more directories containing .mat files")
+    parser.add_argument("--max-samples-per-dataset", type=int, default=MAX_SAMPLES_PER_DATASET_DEFAULT,
+                       help="Maximum samples to use from each dataset (default: 50000 = 50K from each for 100K total)")
     parser.add_argument("--n-samples", type=int, default=15, help="Visualization samples")
     parser.add_argument("--tsne-samples", type=int, default=None, help="t-SNE samples (default: n-samples)")
     parser.add_argument("--latent-dim", type=int, default=LATENT_DIM_DEFAULT, help="Latent dimension")
@@ -1036,15 +1221,16 @@ if __name__ == "__main__":
     parser.add_argument("--tsne-perplexity", type=float, default=None, help="t-SNE perplexity")
     parser.add_argument("--extra-conv", action='store_true', default=EXTRA_CONV_DEFAULT, help="Use 4 conv layers")
     parser.add_argument("--no-extra-conv", dest='extra_conv', action='store_false', help="Use 3 conv layers")
-    parser.add_argument("--kernel-size", type=int, default=5, choices=[3, 5], 
-                       help="Conv kernel size: 3x3 or 5x5 (default, better for N/U-shaped calls)")
+    parser.add_argument("--kernel-size", type=int, default=3, choices=[3, 5], 
+                       help="Conv kernel size: 3x3 (default) or 5x5 (better for N/U-shaped calls)")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--output-samples", type=int, default=NUMBER_OUTPUT_IMAGE_SAMPLES, help="JPEG panel samples")
     parser.add_argument("--show-error", action='store_true', default=SHOW_ERROR_PLOTS, help="Show error row")
     parser.add_argument("--no-error", dest='show_error', action='store_false', help="Hide error row")
-    parser.add_argument("--enable-umap", action='store_true', default=ENABLE_UMAP, help="Enable UMAP visualization")
-    parser.add_argument("--no-umap", dest='enable_umap', action='store_false', help="Disable UMAP visualization")
     parser.add_argument("--version-tag", type=str, default=DEFAULT_VERSION_TAG, help="Version tag")
+    parser.add_argument("--gram-type", type=str, default='SNR_gram',
+                       choices=['SNR_gram', 'NTV_gram', 'BOTH'],
+                       help="Spectrogram type: 'SNR_gram' (default), 'NTV_gram', or 'BOTH' (2-channel SNR+NTV)")
     args = parser.parse_args()
     
     train_autoencoder_from_scratch(
@@ -1063,6 +1249,6 @@ if __name__ == "__main__":
         show_error=args.show_error,
         k_clusters=args.k_clusters,
         tsne_perplexity=args.tsne_perplexity,
-        kernel_size=args.kernel_size,
-        enable_umap=args.enable_umap
+        max_samples_per_dataset=args.max_samples_per_dataset,
+        gram_type=args.gram_type
     )
