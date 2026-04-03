@@ -49,6 +49,7 @@ if param.debug_plot% & param.debug_max_tmid>tmid
     clim([0 30]);colorbar
     %title(sprintf('Filename: %s, middle time %6.2f seconds, %i of %i',GSI_names(Ifile_want).name,tmid,I,length(Itemp)))
     title(titstr{1})
+
     XX=0.5*file_len_sec-0.5*param.duration;
     hold on
     %line(XX,250*[1 1],'color','w','LineWidth',10);
@@ -69,7 +70,8 @@ if param.debug_plot% & param.debug_max_tmid>tmid
     rectangle('Position',[XX(1) param.plot_fmin param.duration param.plot_fmax-param.plot_fmin],'edgecolor','y','Linewidth',1)
     hold off
     %title(sprintf('Final SNR image, SNR: %6.2f, abs start: %s',manual.SNR(I),datestr(manual.tabs(I))));
-    pause
+    %
+    % pause
 end
 
 

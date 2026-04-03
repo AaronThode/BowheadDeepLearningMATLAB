@@ -9,7 +9,7 @@ function GIF_movie_demo(x,type,alpha_value,titstr,initial_azi,initial_el)
 %c = sqrt(X.^2+Y.^2+Z.^2);
 
 % Create figure and initial scatter3
-scale=1;  %Size of plot
+scale=2;  %Size of plot.  The bigger the scale the smaller the file.
 fig = figure('Color','w','Position',[200 200 700/scale 600/scale]);
 ax = axes('Parent',fig);
 % ss(Idir,J)=scatter3(data.x_tsne(Itype,1), data.x_tsne(Itype,2), data.x_tsne(Itype,3), 3,type(Itype),'filled');

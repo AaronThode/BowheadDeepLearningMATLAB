@@ -6,9 +6,10 @@ clear all
 addpath ..
 addpath .
 
-dataset_chc='manual';
+dataset_chc='auto';
 UMAP_dim=3;   %Dimension of UMAP to load
-color_label='type';  %%How to label colors in 3D scattering.  'frequency' or 'type','PeakTime'
+color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
+advanced_labels=true;
 
 [Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 switch dataset_chc
@@ -23,12 +24,18 @@ switch dataset_chc
         Ntypes=length(images_dir);
     case 'auto'
        % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
-        dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
-        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_Auto_SNR+NTV_100K_Date20260212-085534.dir']};
+       %dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
+       dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
+       dir_names={pwd};
 
-        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
-        images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
-        %images_dir{2}=images_dir{1,1};
+       %Original result
+       images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
+       images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
+
+       %Centered result
+       %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir.dir'];
+       %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
+
 
         Ntypes=1;
 end
@@ -37,13 +44,23 @@ for Idir=1:length(dir_names)
     disp(dir_names{Idir})
     mydir=pwd;
     cd([dir_names{Idir} filesep 'UMAP'])
-    data=load(sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc));
+    %file_want=sprintf('umap_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+    file_want=sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc);
+    fpath = fullfile(pwd, file_want);    % current folder + filename
+
+    if isfile(fpath)                  % or: exist(fpath,'file')==2
+        data = load(fpath);
+    else
+        error('File "%s" not found in current folder: %s', file_want, pwd);
+    end
+
+    %data=load(file_want);
     field_want=sprintf('umap_embeddings_%id',UMAP_dim);
     x=data.(field_want);
 
     %%If frequency information not available, load from SNR_gram
-    if ~isfield(data,'rms_bandwidth')
-        Npp=size(data.latent_embeddings,1);
+    if advanced_labels & ~isfield(data,'PeakFrequency')
+        Npp=size(x,1);
         data.PeakFrequency=ones(Npp,1);
         data.PeakTime=ones(Npp,1);
         for II=1:Npp
@@ -67,7 +84,7 @@ for Idir=1:length(dir_names)
         end %%II
         %save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
         save(sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc),"-struct","data")
-    end
+    end  %Advanced labels
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
@@ -105,6 +122,8 @@ for Idir=1:length(dir_names)
                 switch J
                     case 1
                         Itype=find(type<4);
+                        Itype=find(type<4 | type==7);
+                        
                         titstr='Upsweeps, downsweeps, and constant tones';
                         alpha_value=0.3;
                     case 2
@@ -113,7 +132,7 @@ for Idir=1:length(dir_names)
                         alpha_value=0.5;
                 end
             case 'auto'
-                %type(type>0)=1;
+                type(type>0)=1;
                 Itype=1:length(type);
                 %Itype=find(type==0);
                 alpha_value=0.3;
@@ -126,9 +145,9 @@ for Idir=1:length(dir_names)
        
         
         switch color_label
-            case 'frequency'
+            case 'PeakFrequency'
                 x_color=data.PeakFrequency;
-            case 'PeakTime1'
+            case 'PeakTime'
                 x_color=data.PeakTime;
             case 'type'
                 x_color=type;
@@ -223,7 +242,7 @@ for Idir=1:length(dir_names)
                 TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
 
                 imagesc(TT,FF,imgdata.SNR_gram);%colorbar;
-                ylim([0 300]);
+                ylim([0 500]);
                 axis xy
                 set(gca,'fontweight','bold','fontsize',14)
                 title(sprintf('%s,%s',temp_fnames{Iwant(JJ)}(1:22),temp_fnames{Iwant(JJ)}(end-4)),'FontSize',8);

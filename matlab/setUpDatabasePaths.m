@@ -16,9 +16,9 @@ switch hostname(1:end-1)
         if strcmpi(deblank(user_name),'thode')
             fprintf('Using direct drive on AaronThode''s ishmael account\n')
             gitpath = '/Users/thode/Desktop/ThodeLab';
-            data_basedir = '/Users/oboulais/Public/Bowhead_DL_Project';
+            data_basedir = '/Users/oboulais/Public/Bowhead_DL_Project/';
 
-            procdata_basedir = 'data_basedir';
+            procdata_basedir = data_basedir;
             % envdir = '/Volumes/Shared/Databases';
             success=true;
         end

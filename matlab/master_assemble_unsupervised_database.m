@@ -14,9 +14,9 @@ data=load([database_folder '/Database_index.mat']);
 eval(sprintf('!mkdir %s/Unsupervised_database.dir',database_folder));
 eval(sprintf('!rm %s/Unsupervised_database.dir/*.mat',database_folder));
 
-Nsamples=10000;  %%Total data samples wanted in unsupervised database
-manual_fraction=1.00;  %%Fraction of samples that come from manual annotations
-include_airguns=false;  %%If true include spectrograms of likely airgun signals
+Nsamples=100000;  %%Total data samples wanted in unsupervised database
+manual_fraction=0;  %%Fraction of samples that come from manual annotations
+include_airguns=true;  %%If true include spectrograms of likely airgun signals
 
 year_want={'08','10','12','14'};%Note, must be in numerical order
 Site={'3','5'};
