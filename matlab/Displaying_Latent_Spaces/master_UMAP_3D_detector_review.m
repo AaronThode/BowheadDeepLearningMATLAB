@@ -1,4 +1,4 @@
-%master_tSNE_3D_manual.m
+%master_UMAP_3D_detector_review.m
 
 
 %close all
@@ -6,7 +6,7 @@ clear all
 addpath ..
 addpath .
 
-dataset_chc='manual';
+dataset_chc='auto';
 UMAP_dim=3;   %Dimension of UMAP to load
 color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
 advanced_labels=false;
@@ -15,44 +15,39 @@ advanced_labels=false;
 switch dataset_chc
 
     case 'manual'
-        %dir_names={[Database_dir 'LD32/Autoencoder_v14_100E_32LD_32C_Manual_100K_Date20260122-190106.dir'], ...
-         %   [Database_dir 'LD16/Autoencoder_v14_100E_16LD_32C_Manual_100K_Date20260122-190056.dir']};
-
-         dir_names={'../../../Bowhead_DL_Project/Autoencoder_v14_100E_32LD_32C_Manual_100K_Date20260122-190106.dir/'};
+        dir_names={[Database_dir 'LD32/Autoencoder_v14_100E_32LD_32C_Manual_100K_Date20260122-190106.dir'], ...
+            [Database_dir 'LD16/Autoencoder_v14_100E_16LD_32C_Manual_100K_Date20260122-190056.dir']};
 
         images_dir{1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
-        images_dir{2}=images_dir{1};
+        %images_dir{2}=images_dir{1};
 
         Ntypes=length(images_dir);
     case 'auto'
-       % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
-       %dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
-       dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
-       dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
+        % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
+        %dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
+        dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
+        dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
 
-       %Original result
-       images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
-       images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
+        %Original result
+        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
+        images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
 
-       %Centered result
-       images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir.dir'];
-       images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
+        %Centered result
+        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir.dir'];
+        images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
 
 
-        Ntypes=1;
+        Ntypes=2;
 end
 
 for Idir=1:length(dir_names)
     disp(dir_names{Idir})
     mydir=pwd;
 
-    %%%Python UMAP processing
-    cd([dir_names{Idir} filesep 'UMAP'])
-    file_want=sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc);
 
     %%MATLAB UMAP processing
-    %cd([dir_names{Idir} filesep 'MATLAB'])
-    %clofile_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+    cd([dir_names{Idir} filesep 'MATLAB'])
+    file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
 
     fpath = fullfile(pwd, file_want);    % current folder + filename
 
@@ -112,50 +107,54 @@ for Idir=1:length(dir_names)
     %     data.x_tsne=tsne(data.latent_embeddings,'NumDimensions',3);siz
     %     save_flag=true;
     %     save('latent_embeddings.mat','-struct','data');
-    % 
+    %
     % end
     cd(mydir)
 
     type=str2double(extract(data.original_filenames,28));
 
-    figure(Idir)
 
-    for J=1:Ntypes %%Split by call type
+    for Jcat=1:Ntypes %%Split by call type
+        figure(Idir)
 
         switch dataset_chc
             case 'manual'
                 initial_azi=45;
                 initial_el=-25;
 
-                switch J
+                switch Jcat
                     case 1
                         Itype=find(type<4);
                         Itype=find(type<4 | type==7);
-                        Itype=1:length(type);  %All calls
-                        %Itype=find(type==4 | type==5);
-                        
-                
+
                         titstr='Upsweeps, downsweeps, and constant tones';
                         alpha_value=0.3;
-                        %alpha_value=0.8;
                     case 2
                         Itype=find(type==7);
                         titstr='Complex Calls';
                         alpha_value=0.5;
                 end
             case 'auto'
-                %type(type>0)=1;
-                Itype=1:length(type);
-                %Itype=find(type==0);
-                alpha_value=0.3;
                 titstr='All detections';
                 initial_azi=0;
                 initial_el=-5;
+
+                %type(type>0)=1;
+                switch Jcat
+                    case 1
+                        Itype=find(type>0);
+
+                    case 2
+                        Itype=find(type==0);
+                end
+                %Itype=find(type==0);
+                alpha_value=0.3;
+
         end
-       % h(Idir,J)=subplot(1,2,J);
+        % h(Idir,J)=subplot(1,2,J);
         x_norm=(x-mean(x))./std(x);
-       
-        
+
+
         switch color_label
             case 'PeakFrequency'
                 x_color=data.PeakFrequency;
@@ -167,56 +166,62 @@ for Idir=1:length(dir_names)
 
 
         %%%Plot both individually
-        for K=1:2
-            h(Idir,K)=subplot(1,2,K);
-            if K==1
-                ss(Idir,K)=scatter3(x(Itype,1), x(Itype,2), x(Itype,3), 3,x_color(Itype),'filled');
-            else
-                ss(Idir,K)=scatter3(x_norm(Itype,1), x_norm(Itype,2), x_norm(Itype,3), 3,x_color(Itype),'filled');
+        %for K=1:2
+        h(Idir,Jcat)=subplot(1,2,Jcat);
+        %if Jcat==1
+        ss(Idir,Jcat)=scatter3(x(Itype,1), x(Itype,2), x(Itype,3), 3,x_color(Itype),'filled');
+        % else
+        % ss(Idir,K)=scatter3(x_norm(Itype,1), x_norm(Itype,2), x_norm(Itype,3), 3,x_color(Itype),'filled');
 
-            end
-            ss(Idir,K).MarkerEdgeAlpha=alpha_value;
-            ss(Idir,K).MarkerFaceAlpha=alpha_value;
-            grid on
-            axis equal
-            colorbar
-            %if J==1
-            colormap jet
-            % else
-            %    colormap gray
-            % end
+        % end
+        ss(Idir,Jcat).MarkerEdgeAlpha=alpha_value;
+        ss(Idir,Jcat).MarkerFaceAlpha=alpha_value;
+        grid on
+        axis equal
+        colorbar
+        %if J==1
+        colormap jet
+        % else
+        %    colormap gray
+        % end
 
-            xlabel('Dimension 1');
-            ylabel('Dimension 2');
-            zlabel('Dimension 3');
-            title([dir_names{Idir}(1:4) ' ' titstr]);
-            %linkaxes([h(Idir,1) h(Idir,2)]);
+        xlabel('Dimension 1');
+        ylabel('Dimension 2');
+        zlabel('Dimension 3');
+        title([dir_names{Idir}(1:4) ' ' titstr]);
+        if Jcat==2
+            linkaxes([h(Idir,1) h(Idir,2)]);
         end
+        % end
 
         %hLink = linkprop(h(Idir,:), {'CameraPosition','CameraUpVector','CameraTarget'});
 
 
         scatter3_limits_with_azel_edits(x_norm(Itype,:),x_color(Itype));
         colormap jet
-      
+
         myfig=gcf;
 
         colormap jet
         disp('Select rotation check and rotate figure');
         drawnow;
 
-        create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
+        %create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
+        create_gif=[];
         if ~isempty(create_gif)
             titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
             GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
         end
 
-        
+
         figure(myfig)
-        display_sample= input('Switch to transform view, rotate and press 1 when ready...');
+        %display_sample= input('Switch to transform view, rotate and press 1 when ready...');
+        display_sample=[];
+        if isempty(display_sample)
+            continue
+        end
         Xt=gcf().UserData.Xt;
 
-        %1display_sample=input('Enter 1 to review samples using ginput...\n');
 
         notready=true;
         while display_sample & notready

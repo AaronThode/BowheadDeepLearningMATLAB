@@ -4,7 +4,7 @@ function scatter3_limits_with_azel_edits(X0,type)
 % and edit boxes for Azimuth and Elevation
 rng(0)
 %X0 = randn(500,3);
-alpha_value=0.3;
+alpha_value=0.8;
 sizze=8;
 
 % Figure and axes
