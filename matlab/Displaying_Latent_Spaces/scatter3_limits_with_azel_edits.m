@@ -1,7 +1,12 @@
 
-function scatter3_limits_with_azel_edits(X0,type)
+function ud=scatter3_limits_with_azel_edits(X0,type,default_view)
 % Scatter3 with independent X,Y,Z sliders + edit boxes for axis limits
 % and edit boxes for Azimuth and Elevation
+
+if ~exist("default_view","var")
+    default_view=[];
+end
+
 rng(0)
 %X0 = randn(500,3);
 alpha_value=0.8;
@@ -51,7 +56,7 @@ sldEl = uicontrol(fig,'Style','slider','Position',[x0 y-20 w-100 15],'Min',-90,'
 edtEl = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'String',sprintf('%.1f',30),'Callback',@onAzElEdit);
 
 % Checkbox: transform or change view
-chk = uicontrol(fig,'Style','checkbox','Position',[x0 30 320 20],'String','Rotate coordinates (transform points)','Value',0,'Callback',@onControl);
+chk = uicontrol(fig,'Style','checkbox','Position',[x0 30 320 20],'String','Rotate coordinates (transform points)','Value',1,'Callback',@onControl);
 
 % Store handles/data
 ud.X0 = X0; ud.h = h; ud.ax = ax;
@@ -63,6 +68,15 @@ fig.UserData = ud;
 
 % Initialize symmetric limits [-3 3] and update display
 setInitialLimits([-5 5], [-5 5], [-5 5]);
+if ~isempty(default_view)
+
+    set(ud.edtAz,'String',sprintf('%.1f', default_view(1)));
+    set(ud.edtEl,'String',sprintf('%.1f', default_view(2)));
+    set(ud.sldAz,'Value',default_view(1));
+    set(ud.sldEl,'Value',default_view(2));
+    % updateEditsFromAxes();
+    %applyRotationAndView();
+end
 updateDisplay();
 
 % --- Callbacks -------------------------------------------------------

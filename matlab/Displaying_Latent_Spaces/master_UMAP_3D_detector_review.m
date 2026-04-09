@@ -16,7 +16,8 @@ n_neighbors=15;
 min_dist=0.1;
 save_template=false;
 %n_components=3;
-
+zlimm_want=[0.2 0.4];  %%%Restrict zaxis when selecting samples
+   
 [Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 switch dataset_chc
 
@@ -215,10 +216,17 @@ for Idir=1:length(dir_names)
 
     end %Jcat
 
-    %%%Plot all detections with UI controls
-    scatter3_limits_with_azel_edits(x_norm,x_color);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%Plot all detections with UI controls%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81]);
     colormap jet
 
+    %%%Slice the cake to a chosen layer...
+     zlim(ud.ax,zlimm_want);
+    set(ud.sldZ,'Value',max(abs(zlimm_want)));
+    set(ud.edtZ,'String',sprintf('%4.3f %4.2f',zlimm_want(1),zlimm_want(2)));
     myfig=gcf;
 
     disp('Select rotation check and rotate figure');
@@ -231,52 +239,11 @@ for Idir=1:length(dir_names)
     %     GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
     % end
 
-
     display_sample= input('Switch to transform view, rotate and press 1 when ready...');
     if isempty(display_sample)
         continue
     end
-    Xt=gcf().UserData.Xt;
-
-
-    notready=true;
-    while display_sample && notready
-        Xt=gcf().UserData.Xt;
-
-        tmp=ginput(2);
-        tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
-        Icluster=find(Xt(:,1)>min(tmp(:,1))&Xt(:,1)<max(tmp(:,1)) ...
-            &Xt(:,2)>min(tmp(:,2)) &Xt(:,2)<max(tmp(:,2)) ...
-            &Xt(:,3)>min(tmp(:,3)) &Xt(:,3)<max(tmp(:,3)));
-
-        temp_fnames=data.original_filenames(Icluster);
-        temp_type=type(Icluster);
-
-        temp_Imanual=find(temp_type>0);
-        temp_Iauto=find(temp_type==0);
-
-        N_manual=length(temp_Imanual);
-        N_unmarked=length(temp_Iauto);
-        fprintf('Out of %i detections there are %i manual calls and %i unmarked signals in this sample \n', ...
-            length(Icluster),N_manual,N_unmarked);
-
-        %Display manual examples
-        hh=gcf().UserData.ax;
-        hh.Title.String=sprintf('%i Samples in range',length(Icluster));
-        hh.Title.FontWeight="bold";
-        hh.Title.FontSize=14;
-
-        %Ncalls=min([30 length(Icluster)]);
-        %Iwant=(randperm(length(Icluster),Ncalls));
-
-        make_tile_spectrograms("Manual",temp_Imanual,temp_fnames,dataset_chc,images_dir);
-        make_tile_spectrograms("Auto",temp_Iauto,temp_fnames,dataset_chc,images_dir);
-
-        
-        notready=input('Enter 1 to make another selection:');
-        close(3:length(get(0).Children))
-    end
-    %end %J
+    select_and_display_samples_from_UMAP_display;
 
 
     clear data
