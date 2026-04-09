@@ -62,7 +62,7 @@ ud.chk = chk;
 fig.UserData = ud;
 
 % Initialize symmetric limits [-3 3] and update display
-%setInitialLimits([-3 3], [-3 3], [-3 3]);
+setInitialLimits([-5 5], [-5 5], [-5 5]);
 updateDisplay();
 
 % --- Callbacks -------------------------------------------------------

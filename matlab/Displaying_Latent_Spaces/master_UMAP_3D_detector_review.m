@@ -1,15 +1,21 @@
 %master_UMAP_3D_detector_review.m
 
 
-%close all
+close all
 clear all
 addpath ..
 addpath .
 
 dataset_chc='auto';
-UMAP_dim=3;   %Dimension of UMAP to load
+force_UMAP_recompute=false;
+UMAP_dim=3;   %Dimension of UMAP to compute
 color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
 advanced_labels=false;
+addpath ../../../umapAndEppFileExchange_v4_6/umap
+n_neighbors=15;
+min_dist=0.1;
+save_template=false;
+%n_components=3;
 
 [Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 switch dataset_chc
@@ -26,14 +32,14 @@ switch dataset_chc
         % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
         %dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
         dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
-        dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
+        %dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
 
         %Original result
-        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
-        images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
+        %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
+        %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
 
         %Centered result
-        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir.dir'];
+        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir'];
         images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
 
 
@@ -47,19 +53,32 @@ for Idir=1:length(dir_names)
 
     %%MATLAB UMAP processing
     cd([dir_names{Idir} filesep 'MATLAB'])
-    file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+
+    if  force_UMAP_recompute
+        file_want=sprintf('latent_embeddings.mat');
+    else
+        file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+    end
 
     fpath = fullfile(pwd, file_want);    % current folder + filename
-
     if isfile(fpath)                  % or: exist(fpath,'file')==2
         data = load(fpath);
     else
         error('File "%s" not found in current folder: %s', file_want, pwd);
     end
 
-    %data=load(file_want);
+
+    %%%Compute UMAP results...
     field_want=sprintf('umap_embeddings_%id',UMAP_dim);
-    x=data.(field_want);
+
+    if force_UMAP_recompute
+        [x, umap, clusterIds, extras]= ...
+            run_umap(double(data.latent_embeddings),'n_components', UMAP_dim,'min_dist',min_dist,'n_neighbors',n_neighbors,'verbose','text');
+        data.(field_want)=x;
+        %save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+    else
+        x=data.(field_want);
+    end
 
     %%If frequency information not available, load from SNR_gram
     if advanced_labels & ~isfield(data,'PeakFrequency')
@@ -86,8 +105,9 @@ for Idir=1:length(dir_names)
 
         end %%II
         %save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
-        save(sprintf('umap_embeddings_%id_%s.mat',UMAP_dim,dataset_chc),"-struct","data")
+        save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
     end  %Advanced labels
+
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
@@ -100,20 +120,13 @@ for Idir=1:length(dir_names)
         %  Used to judge which components to keep
         x=score;
     end
-    %%update UMAP if data doesn't exist
-    % save_flag=false;
-    % if ~isfield(data,'x_tsne')
-    %     disp('Recomputing tSNE...')
-    %     data.x_tsne=tsne(data.latent_embeddings,'NumDimensions',3);siz
-    %     save_flag=true;
-    %     save('latent_embeddings.mat','-struct','data');
-    %
-    % end
+
     cd(mydir)
 
     type=str2double(extract(data.original_filenames,28));
 
 
+    %%%Create overview plot to help identify where to search for calls.
     for Jcat=1:Ntypes %%Split by call type
         figure(Idir)
 
@@ -135,7 +148,6 @@ for Idir=1:length(dir_names)
                         alpha_value=0.5;
                 end
             case 'auto'
-                titstr='All detections';
                 initial_azi=0;
                 initial_el=-5;
 
@@ -143,9 +155,13 @@ for Idir=1:length(dir_names)
                 switch Jcat
                     case 1
                         Itype=find(type>0);
+                        titstr='Manual calls';
+
 
                     case 2
                         Itype=find(type==0);
+                        titstr='Generic detection';
+
                 end
                 %Itype=find(type==0);
                 alpha_value=0.3;
@@ -191,95 +207,76 @@ for Idir=1:length(dir_names)
         title([dir_names{Idir}(1:4) ' ' titstr]);
         if Jcat==2
             linkaxes([h(Idir,1) h(Idir,2)]);
+            linkprop([h(Idir,1) h(Idir,2)],'View');
         end
         % end
 
         %hLink = linkprop(h(Idir,:), {'CameraPosition','CameraUpVector','CameraTarget'});
 
+    end %Jcat
 
-        scatter3_limits_with_azel_edits(x_norm(Itype,:),x_color(Itype));
-        colormap jet
+    %%%Plot all detections with UI controls
+    scatter3_limits_with_azel_edits(x_norm,x_color);
+    colormap jet
 
-        myfig=gcf;
+    myfig=gcf;
 
-        colormap jet
-        disp('Select rotation check and rotate figure');
-        drawnow;
+    disp('Select rotation check and rotate figure');
+    drawnow;
 
-        %create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
-        create_gif=[];
-        if ~isempty(create_gif)
-            titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
-            GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
-        end
+    %create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
+    % create_gif=[];
+    % if ~isempty(create_gif)
+    %     titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
+    %     GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
+    % end
 
 
-        figure(myfig)
-        %display_sample= input('Switch to transform view, rotate and press 1 when ready...');
-        display_sample=[];
-        if isempty(display_sample)
-            continue
-        end
+    display_sample= input('Switch to transform view, rotate and press 1 when ready...');
+    if isempty(display_sample)
+        continue
+    end
+    Xt=gcf().UserData.Xt;
+
+
+    notready=true;
+    while display_sample && notready
         Xt=gcf().UserData.Xt;
 
+        tmp=ginput(2);
+        tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
+        Icluster=find(Xt(:,1)>min(tmp(:,1))&Xt(:,1)<max(tmp(:,1)) ...
+            &Xt(:,2)>min(tmp(:,2)) &Xt(:,2)<max(tmp(:,2)) ...
+            &Xt(:,3)>min(tmp(:,3)) &Xt(:,3)<max(tmp(:,3)));
 
-        notready=true;
-        while display_sample & notready
-            Xt=gcf().UserData.Xt;
+        temp_fnames=data.original_filenames(Icluster);
+        temp_type=type(Icluster);
 
-            tmp=ginput(2);
-            tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
-            Icluster=find(Xt(:,1)>min(tmp(:,1))&Xt(:,1)<max(tmp(:,1)) ...
-                &Xt(:,2)>min(tmp(:,2)) &Xt(:,2)<max(tmp(:,2)) ...
-                &Xt(:,3)>min(tmp(:,3)) &Xt(:,3)<max(tmp(:,3)));
+        temp_Imanual=find(temp_type>0);
+        temp_Iauto=find(temp_type==0);
 
-            temp_fnames=data.original_filenames(Itype(Icluster));
+        N_manual=length(temp_Imanual);
+        N_unmarked=length(temp_Iauto);
+        fprintf('Out of %i detections there are %i manual calls and %i unmarked signals in this sample \n', ...
+            length(Icluster),N_manual,N_unmarked);
 
-            hh=gcf().UserData.ax;
-            hh.Title.String=sprintf('%i Samples in range',length(Icluster));
-            hh.Title.FontWeight="bold";
-            hh.Title.FontSize=14;
+        %Display manual examples
+        hh=gcf().UserData.ax;
+        hh.Title.String=sprintf('%i Samples in range',length(Icluster));
+        hh.Title.FontWeight="bold";
+        hh.Title.FontSize=14;
 
-            Ncalls=min([30 length(Icluster)]);
-            Iwant=(randperm(length(Icluster),Ncalls));
-            figure;set(gcf,'Position',[ 11          60        1745         874  ]);
-            for JJ=1:Ncalls
-                subplot(3,10,JJ)
-                disp(temp_fnames{Iwant(JJ)})
-                % type(Itype(Icluster(Iwant(JJ))));  %Should be same type as
-                % in file name
+        %Ncalls=min([30 length(Icluster)]);
+        %Iwant=(randperm(length(Icluster),Ncalls));
 
-                if strcmp(dataset_chc,'manual')
-                    imgdata=load(sprintf('%s%s%s',images_dir{Idir},filesep,temp_fnames{Iwant(JJ)}));
-                else
-                    if strcmp(temp_fnames{Iwant(JJ)}(end-4),'0')
-                        imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,temp_fnames{Iwant(JJ)}));
-                    else
-                        imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,temp_fnames{Iwant(JJ)}));
-                    end
-                end
-                FF=imgdata.dF*(0:size(imgdata.SNR_gram,1));
-                TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
+        make_tile_spectrograms("Manual",temp_Imanual,temp_fnames,dataset_chc,images_dir);
+        make_tile_spectrograms("Auto",temp_Iauto,temp_fnames,dataset_chc,images_dir);
 
-                imagesc(TT,FF,imgdata.SNR_gram);%colorbar;
-                ylim([0 500]);
-                axis xy
-                set(gca,'fontweight','bold','fontsize',14)
-                title(sprintf('%s,%s',temp_fnames{Iwant(JJ)}(1:22),temp_fnames{Iwant(JJ)}(end-4)),'FontSize',8);
-                if rem(JJ,10)~=1
-                    set(gca,'ytick',[]);
-                else
-                    ylabel('Hz')
-                end
-                if JJ<21
-                    set(gca,'xtick',[]);
-                else
-                    xlabel('Time (sec)')
-                end
-            end
-            notready=input('Enter 1 to make another selection:');
-        end
-    end %J
+        
+        notready=input('Enter 1 to make another selection:');
+        close(3:length(get(0).Children))
+    end
+    %end %J
 
 
     clear data
