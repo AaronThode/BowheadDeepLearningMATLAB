@@ -30,15 +30,18 @@ while display_sample & notready
 
     %Display manual examples
     hh=gcf().UserData.ax;
-    hh.Title.String=sprintf('%i Samples in range',length(Icluster));
+    hh.Title.String=sprintf('%i Samples in range, %i manual, %i auto', ...
+        length(Icluster),N_manual,N_unmarked);
     hh.Title.FontWeight="bold";
     hh.Title.FontSize=14;
 
     %Ncalls=min([30 length(Icluster)]);
     %Iwant=(randperm(length(Icluster),Ncalls));
 
-    make_tile_spectrograms("Manual",temp_Imanual,temp_fnames,dataset_chc,images_dir);
-    make_tile_spectrograms("Auto",temp_Iauto,temp_fnames,dataset_chc,images_dir);
+    if display_manual
+        make_tile_spectrograms("Manual",temp_Imanual,temp_fnames,dataset_chc,images_dir,display_NTV);
+    end
+    make_tile_spectrograms("Auto",temp_Iauto,temp_fnames,dataset_chc,images_dir,display_NTV);
 
 
     notready=input('Enter 1 to make another selection:');

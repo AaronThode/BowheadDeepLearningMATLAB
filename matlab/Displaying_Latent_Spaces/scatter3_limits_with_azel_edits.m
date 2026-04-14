@@ -1,15 +1,17 @@
 
-function ud=scatter3_limits_with_azel_edits(X0,type,default_view)
+function ud=scatter3_limits_with_azel_edits(X0,type,default_view,zlimm_want)
 % Scatter3 with independent X,Y,Z sliders + edit boxes for axis limits
 % and edit boxes for Azimuth and Elevation
 
 if ~exist("default_view","var")
     default_view=[];
 end
-
+if ~exist("zlimm_want","var")
+    zlimm_want=[];
+end
 rng(0)
 %X0 = randn(500,3);
-alpha_value=0.8;
+alpha_value=0.3;
 sizze=8;
 
 % Figure and axes
@@ -76,6 +78,13 @@ if ~isempty(default_view)
     set(ud.sldEl,'Value',default_view(2));
     % updateEditsFromAxes();
     %applyRotationAndView();
+end
+
+%%%Slice the cake to a chosen layer...
+if ~isempty(zlimm_want)
+    zlim(ud.ax,zlimm_want);
+    set(ud.sldZ,'Value',max(abs(zlimm_want)));
+    set(ud.edtZ,'String',sprintf('%4.3f %4.2f',zlimm_want(1),zlimm_want(2)));
 end
 updateDisplay();
 

@@ -8,16 +8,22 @@ addpath .
 
 dataset_chc='auto';
 force_UMAP_recompute=false;
-UMAP_dim=3;   %Dimension of UMAP to compute
 color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
 advanced_labels=false;
+
+%%%UMAP parameters
 addpath ../../../umapAndEppFileExchange_v4_6/umap
+UMAP_dim=3;   %Dimension of UMAP to compute
 n_neighbors=15;
 min_dist=0.1;
 save_template=false;
-%n_components=3;
+
+%%%Data review parameters
 zlimm_want=[0.2 0.4];  %%%Restrict zaxis when selecting samples
-   
+display_manual=true;
+display_NTV=false;
+display_call_classifications=false;
+
 [Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 switch dataset_chc
 
@@ -152,7 +158,10 @@ for Idir=1:length(dir_names)
                 initial_azi=0;
                 initial_el=-5;
 
-                %type(type>0)=1;
+                %%%Detection problem only
+                if ~display_call_classifications
+                    type(type>0)=1;
+                end
                 switch Jcat
                     case 1
                         Itype=find(type>0);
@@ -165,7 +174,7 @@ for Idir=1:length(dir_names)
 
                 end
                 %Itype=find(type==0);
-                alpha_value=0.3;
+                alpha_value=0.1;
 
         end
         % h(Idir,J)=subplot(1,2,J);
@@ -220,14 +229,10 @@ for Idir=1:length(dir_names)
     %%%Plot all detections with UI controls%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81]);
+    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
     colormap jet
 
-    %%%Slice the cake to a chosen layer...
-     zlim(ud.ax,zlimm_want);
-    set(ud.sldZ,'Value',max(abs(zlimm_want)));
-    set(ud.edtZ,'String',sprintf('%4.3f %4.2f',zlimm_want(1),zlimm_want(2)));
-    myfig=gcf;
+     myfig=gcf;
 
     disp('Select rotation check and rotate figure');
     drawnow;
