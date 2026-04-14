@@ -55,18 +55,17 @@ for JJ=1:Nsamples
     tabs_call=tabs_call-duration(0,0,tsec_shift);
     
      
-    ctime_call=posixtime(tabs_call);  %%Offically this is assumming utc time
+    ctime_call=posixtime(tabs_call)+8*3600;  %All ctimes are in UTC
     call_event.ctime=manual_logs.manual_data{Isite,Iyear}.localized.ctev_UTC;
     call_event.ctimes=manual_logs.manual_data{Isite,Iyear}.ind.ctime(:,Iletter);
     call_event.ctimes(isnan(call_event.ctimes))=Inf;
 
     %%%Note that times in manual logs are in UTC time!
     call_event.tabs=datetime(1970,1,1,-8,0,call_event.ctimes); %-8 converts from UTC time (archive) to local time (GSI WAV)
-
     call_event.ranges=manual_logs.manual_data{Isite,Iyear}.localized.range;
     
-    
-    Itest1=find(abs(ctime_call-call_event.ctime)<call_event.ranges(Iletter,:)'/1.5);
+    temp=abs(abs(ctime_call-call_event.ctime)-call_event.ranges(Iletter,:)'/1.5);
+    Itest1=find(temp<5);
     
     call_event.flows=manual_logs.manual_data{Isite,Iyear}.ind.flo(Itest1,:);
     call_event.fhighs=manual_logs.manual_data{Isite,Iyear}.ind.fhi(Itest1,:);
@@ -79,9 +78,7 @@ for JJ=1:Nsamples
         Ibest=find(minn<duration(0,0,1.5));
         type_color='g';
     else
-        min(minn)
-        
-    
+        min(minn) 
     end
     %manual_logs.manual_data{Isite,Iyear}.localized.wctype(Ipossible_manual_call);
 
@@ -132,7 +129,6 @@ for JJ=1:Nsamples
         axis xy
         set(gca,'fontweight','bold','fontsize',14)
         title(fnames{(JJ)}(1:22),'FontSize',8);
-        text(0.1,450,fnames{(JJ)}(end-4),'color',type_color,'fontsize',12)
         if rem(Iplot,10)~=1
             set(gca,'ytick',[]);
         else
@@ -145,10 +141,14 @@ for JJ=1:Nsamples
         end
 
         [outputs]=extract_features_from_SNRgram(imgdata.dT,imgdata.dF,imgdata.SNR_gram);
-        text(0.1,20,sprintf('%3.1f dB',outputs.SNR),'color',type_color,'fontsize',8); %SNR
+        text(0.1,450,int2str(Iplot),'color',type_color,'fontsize',12);  %Call type
+        
+        text(2.0,450,fnames{(JJ)}(end-4),'color',type_color,'fontsize',12);  %Call type
+        
+        text(0.1,-20,sprintf('%3.1f dB',outputs.SNR),'color','k','fontsize',8); %SNR
         text(0.1,420,sprintf('%3.1f s man',seconds(min(minn))),'color',type_color,'fontsize',8);%closest manual call
         if ~isempty(outputs.duration)
-             text(0.1,50,sprintf('%3.1f s',outputs.duration),'color',type_color,'fontsize',8);
+             text(0.1,-50,sprintf('%3.1f s',outputs.duration),'color','k','fontsize',8);
         end
     end %I
 end %JJ
