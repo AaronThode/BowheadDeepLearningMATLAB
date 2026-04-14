@@ -1,9 +1,10 @@
 function  [outputs]=extract_features_from_SNRgram(dT,dF,SNR_gram)
 
+debug_plot=false;
+
 image_scale_factor=5;
 mindB=5;
 min_prominence=3;
-debug_plot=true;
 
 FF=dF*(1:size(SNR_gram,1));
 TT=dT*(1:size(SNR_gram,2));

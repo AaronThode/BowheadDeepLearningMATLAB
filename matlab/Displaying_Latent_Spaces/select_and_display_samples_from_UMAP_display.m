@@ -39,9 +39,9 @@ while display_sample & notready
     %Iwant=(randperm(length(Icluster),Ncalls));
 
     if display_manual
-        make_tile_spectrograms("Manual",temp_Imanual,temp_fnames,dataset_chc,images_dir,display_NTV);
+        make_tile_spectrograms("Manual",temp_fnames(temp_Imanual),dataset_chc,images_dir,display_NTV);
     end
-    make_tile_spectrograms("Auto",temp_Iauto,temp_fnames,dataset_chc,images_dir,display_NTV);
+    make_tile_spectrograms("Auto",temp_fnames(temp_Iauto),dataset_chc,images_dir,display_NTV);
 
 
     notready=input('Enter 1 to make another selection:');
