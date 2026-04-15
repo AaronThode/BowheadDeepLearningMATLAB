@@ -56,22 +56,17 @@ for JJ=1:Nsamples
     
      
     ctime_call=posixtime(tabs_call)+8*3600;  %All ctimes are in UTC
-    call_event.ctime=manual_logs.manual_data{Isite,Iyear}.localized.ctev_UTC;
-    call_event.ctimes=manual_logs.manual_data{Isite,Iyear}.ind.ctime(:,Iletter);
+    call_event.ctime=manual_logs.manual_data{Isite,Iyear}.localized.ctev_UTC;  %Time of call event
+    call_event.ctimes=manual_logs.manual_data{Isite,Iyear}.ind.ctime(:,Iletter);  %Time of call reception at target DASAR
     call_event.ctimes(isnan(call_event.ctimes))=Inf;
 
     %%%Note that times in manual logs are in UTC time!
     call_event.tabs=datetime(1970,1,1,-8,0,call_event.ctimes); %-8 converts from UTC time (archive) to local time (GSI WAV)
     call_event.ranges=manual_logs.manual_data{Isite,Iyear}.localized.range;
-    
-    temp=abs(abs(ctime_call-call_event.ctime)-call_event.ranges(Iletter,:)'/1.5);
-    Itest1=find(temp<5);
-    
-    call_event.flows=manual_logs.manual_data{Isite,Iyear}.ind.flo(Itest1,:);
-    call_event.fhighs=manual_logs.manual_data{Isite,Iyear}.ind.fhi(Itest1,:);
-    call_event.SNR=manual_logs.manual_data{Isite,Iyear}.ind.stndb(Itest1,:);
-    
 
+    %Ctimes in UTC, datetimes (tabs) in local time...
+    
+    %%%First see if target call is in manual database...
     type_color='w';
     minn=abs(tabs_call-call_event.tabs);
     if any(minn<duration(0,0,1.5))
@@ -80,6 +75,27 @@ for JJ=1:Nsamples
     else
         min(minn) 
     end
+
+    temp=abs(abs(ctime_call-call_event.ctime)-call_event.ranges(Iletter,:)'/1.5);
+    Iloc_candidate=find(temp<5);
+    match_score=zeros(1,length(Iloc_candidate));
+    for K=1:length(Iloc_candidate)
+        II=Iloc_candidate(K);
+        call_cand.flows=manual_logs.manual_data{Isite,Iyear}.ind.flo(II,:);
+        call_cand.fhighs=manual_logs.manual_data{Isite,Iyear}.ind.fhi(II,:);
+        call_cand.SNR=manual_logs.manual_data{Isite,Iyear}.ind.stndb(II,:);
+        call_cand.ctimes=manual_logs.manual_data{Isite,Iyear}.ind.ctime(II,:);  %Time of call reception at target DASAR
+    
+        Isep=abs((1:7)-Iletter)+1;
+        possible_matches=abs(call_cand.ctimes-call_cand.ctimes(Iletter))./(1.5*separation_distance(Isep)/1.5);
+        match_score(K)=sum(possible_matches<1);  %Don't count myself because it will be a NaN
+    end
+    if isempty(max(match_score))||isnan(max(match_score))
+        match_score=0;
+    else
+        match_score=max(match_score);
+    end
+    
     %manual_logs.manual_data{Isite,Iyear}.localized.wctype(Ipossible_manual_call);
 
     Iplot=Iplot+1;
@@ -111,9 +127,9 @@ for JJ=1:Nsamples
     FF=imgdata.dF*(0:size(imgdata.SNR_gram,1));
     TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
 
-    for Itest1=1:Nplots_per_sample
+    for Iloc_candidate=1:Nplots_per_sample
 
-        if Itest1==1
+        if Iloc_candidate==1
             imagesc(TT,FF,double(imgdata.SNR_gram)/5);colorbar;
             
         elseif plot_NTV
@@ -141,12 +157,14 @@ for JJ=1:Nsamples
         end
 
         [outputs]=extract_features_from_SNRgram(imgdata.dT,imgdata.dF,imgdata.SNR_gram);
-        text(0.1,450,int2str(Iplot),'color',type_color,'fontsize',12);  %Call type
+        text(0.1,450,int2str(Iplot),'color',type_color,'fontsize',12);  %Plot number
         
         text(2.0,450,fnames{(JJ)}(end-4),'color',type_color,'fontsize',12);  %Call type
         
         text(0.1,-20,sprintf('%3.1f dB',outputs.SNR),'color','k','fontsize',8); %SNR
-        text(0.1,420,sprintf('%3.1f s man',seconds(min(minn))),'color',type_color,'fontsize',8);%closest manual call
+        text(0.1,400,sprintf('%3.1f s',seconds(min(minn))),'color',type_color,'fontsize',8);%closest manual call
+        text(0.1,380,sprintf('%i mtch',(match_score)),'color',type_color,'fontsize',8);%closest manual call
+       
         if ~isempty(outputs.duration)
              text(0.1,-50,sprintf('%3.1f s',outputs.duration),'color','k','fontsize',8);
         end
