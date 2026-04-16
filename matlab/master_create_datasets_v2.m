@@ -25,7 +25,7 @@ warning off
 %%%Computer specific information
 [~,hostname]=system('hostname');
 if contains(hostname,'ishmael')
-    GSI_file_dir='/Volumes/Shared-2/Data/';
+    GSI_file_dir='~/mnt/jonah3/Shared/Data';
     code_dir='/Users/thode/Desktop/DeepLearningBowhead/Software_repo/matlab';
     WAV_file_dir='/Volumes/Bowhead4/';
     Manual_record_files_dir='../../Shell_Manual_Results';
@@ -66,7 +66,7 @@ year_want={'08','09','10','11','12','13','14'};  %What years to process
 Site={'2','3','4','5'};  %What sites to process
 
 year_want={'08','10','12','14'};
-Site={'5'};
+Site={'3','5'};
 
 %year_want={'08'};
 %Site={'5'};
@@ -435,6 +435,9 @@ for Iyear=1:length(year_want)
                             param.spec.debug_plot=false;
                         end
 
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        %%%%%%%%Create SNR gram (spectrogram)%%%%%%%%%%%%%%%
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                         [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                         
                         %%%Sometimes file length not right
@@ -444,10 +447,16 @@ for Iyear=1:length(year_want)
 
                         %%%Extract peak frequency and time%%%
                         [temp]=extract_features_from_SNRgram(TT(2)-TT(1),FF(2)-FF(1),SNR_gram);
-                        PeakFrequency=temp.Fmax;
-                        PeakTime=temp.Tmax;
+                        features.fpeak=temp.Fmax;
+                        features.tpeak=temp.Tmax;
+                        features.duration2=temp.duration;
+                        features.SNR=temp.SNR;
+                        features.fmin=detect.fmin(Idet);  
+                        features.fmax=detect.fmax(Idet);
+                        features.duration1=detect.duration(Idet);
+                        features.dB_RMS=detect.dB_RMS(Idet);
+                        features.magnitude=detect.magnitude(Idet);
 
-                        
                         if  param.spec.debug_plot & mytype>0
                             Iman=Manual_index(II,1);
                             fprintf('Call %i of %i, Type %i, Score %6.2f\n',Iman,length(manual.tend),mytype,Score{Ichunk}(II,1));
@@ -499,7 +508,7 @@ for Iyear=1:length(year_want)
                             dF=FF(2)-FF(1);dT=TT(2)-TT(1);
                             NTV_gram=VS_metrics{2};KEtoPE_gram=VS_metrics{3};Polar_gram=VS_metrics{4};
                             save([current_save_dir{Idir} filesep output_name],'SNR_gram','NTV_gram','KEtoPE_gram','Polar_gram', ...
-                                'dF','dT','bearing','tabs_tstartt','PeakFrequency','PeakTime');
+                                'dF','dT','bearing','tabs_tstartt','features');
 
                         end
                     end %Idet
