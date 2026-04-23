@@ -36,19 +36,29 @@ switch dataset_chc
 
         Ntypes=length(images_dir);
     case 'auto'
-        % dir_names={[Database_dir '/LD16/Autoencoder_v13_100E_16LD_32C_AutoManual_Combined_100K_Date20260119-222955.dir']};
-        %dir_names={[Database_dir '/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20251228-124835.dir']};
-        dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
-        %dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
-
-        %Original result
+         %Original result, with samples not centered in time...
         %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
         %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
 
-        %Centered result
+        %%%Baseline
+        dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
+        %dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
+         %Centered result
         images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir'];
         images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
 
+        %%%Revised with everything labeled properly
+        clear dir_names
+        Database_dir='../../../Bowhead_DL_Project/';
+        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
+        dir_names={[Database_dir '/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/']};
+        %Centered result
+
+        Image_database_dir='/Volumes/Maui2025';
+        images_dir{1,1}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
+        images_dir{1,2}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
+
+       
 
         Ntypes=2;
 end
@@ -82,7 +92,7 @@ for Idir=1:length(dir_names)
         [x, umap, clusterIds, extras]= ...
             run_umap(double(data.latent_embeddings),'n_components', UMAP_dim,'min_dist',min_dist,'n_neighbors',n_neighbors,'verbose','text');
         data.(field_want)=x;
-        %save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+        save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
     else
         x=data.(field_want);
     end
@@ -174,7 +184,7 @@ for Idir=1:length(dir_names)
 
                 end
                 %Itype=find(type==0);
-                alpha_value=0.1;
+                alpha_value=0.02;
 
         end
         % h(Idir,J)=subplot(1,2,J);
@@ -229,7 +239,11 @@ for Idir=1:length(dir_names)
     %%%Plot all detections with UI controls%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
+    %%%Optional flip to try to get better view of data...
+    x_norm=-x_norm;
+    %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
+    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[132 50],zlimm_want);
+    
     colormap jet
 
      myfig=gcf;

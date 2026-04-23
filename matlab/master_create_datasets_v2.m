@@ -144,8 +144,11 @@ for Iyear=1:length(year_want)
             DASAR_list{I}=sprintf('S%s%s%s0',Site{Isite},year_want{Iyear},DASAR_strings(I));
         end
 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%Import manual analyst archive, and if needed, repackage as
         %%%%%%%convenient MAT file for future access.
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
         ctmin=0;
         ctmax=Inf;
         fname=sprintf('%s%s20%s%sAllSite%s_20%s_manual_archive.txt', ...
@@ -190,8 +193,8 @@ for Iyear=1:length(year_want)
         call_type_all=call_type_all(Itype);
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%Start spectrogram creation loop 
-        %%%Loop through dates and create a selection file for each DASAR and day
+        %%% Start spectrogram creation loop 
+        %%% Loop through dates and create a selection file for each DASAR and day
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         for Id=debug.Idasar_start:length(DASAR_list)  %For each DASAR desired
@@ -216,7 +219,7 @@ for Iyear=1:length(year_want)
             tabs_start=datenum(temp);
             tabs_start_unique=unique(tabs_start);  %%%The individual days present in the manual data for this DASAR/Site/year.
 
-            %%%%%%%Download raw acoustic data%%%%%%%%%%%%%%
+            %%%%%%%Download acoustic header, which has clock drift%%%%%%%%%%%%%%
             if strcmpi(data_file_type,'gsi')
                 dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
                     GSI_file_dir,year_want{Iyear},Site{Isite},year_want{Iyear}, ...
@@ -312,7 +315,8 @@ for Iyear=1:length(year_want)
                 Ithis_day=Ithis_day(manual.tsec<debug.sec_to_load); %%In case only loaded part of file
                 manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
                 manual.tabs=tabs_DASAR(Ithis_day);
-                manual.tsec=manual.tsec*(1+head.tdrift/86400);
+                tdrift_file=head.tdrift;
+                manual.tsec=manual.tsec*(1+head.tdrift/86400);  %This converts manual time into acoustic time...
                
                 manual.duration=manual.ind.duration(Iexist(Ithis_day),Id);
                 manual.tmid=manual.tsec+0.5*manual.duration;
@@ -350,7 +354,7 @@ for Iyear=1:length(year_want)
                 %x=int16(x-2^15);
 
 
-                 %%%%%%%%%%%%%%%%%Energy Detector.m%%%%%%%%%%%%%%%%%%%
+                %%%%%%%%%%%%%%%%%%Energy Detector.m%%%%%%%%%%%%%%%%%%%
                 %%% Now generate false detections by a simple event
                 %%% detector and check that they aren't whale calls.
                 %
@@ -376,6 +380,7 @@ for Iyear=1:length(year_want)
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                     %%%%%%Determine whether any overlap exists between
                     %%%manual detections and these detections.
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
                     param.compare.ovlap=0.5; %Fraction of time overlap required to count as 'hit'
                     [Score{Ichunk},Manual_index]=evaluate_overlap_between_manual_automated(manual.tsec,manual.tend,detect.tstart,detect.tend,param.compare.ovlap);
@@ -386,7 +391,7 @@ for Iyear=1:length(year_want)
                     Manual_index_match=Manual_index(:);
                     Manual_index_match=unique(Manual_index_match(~isnan(Manual_index_match)));  %unique may not be needed
 
-                    %%%%%Determine manual annotations that were missed by
+                    %%%%%  Determine manual annotations that were missed by
                     %%%%%  automated detector.
                     Imiss=setdiff(min(Manual_index_match):max(Manual_index_match),Manual_index_match);
                     fprintf('%i out of %i (%6.2f percent) manual detections in this chunk missing from automated detections\n',length(Imiss),max(Manual_index_match),100*length(Imiss)/max(Manual_index_match))
@@ -440,6 +445,8 @@ for Iyear=1:length(year_want)
                         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                         [SNR_gram,VS_metrics,FF,TT,bearing]=create_spectrogram_sample(x,head.Fs,tmid,file_len_sec,spectrogram_len_sec,param.spec,titstr);
                         
+
+
                         %%%Sometimes file length not right
                         if isempty(SNR_gram)
                             continue

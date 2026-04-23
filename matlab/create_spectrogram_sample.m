@@ -43,7 +43,7 @@ TT=TT(Itt);FF=FF(Iff);
 %end
 
 if param.debug_plot% & param.debug_max_tmid>tmid
-    figure(1)
+    figure
     subplot(2,1,1)
     spectrogram(double(y(:,1)),param.Nfft,param.Nfft/2,param.Nfft,Fs,'yaxis')
     clim([0 30]);colorbar

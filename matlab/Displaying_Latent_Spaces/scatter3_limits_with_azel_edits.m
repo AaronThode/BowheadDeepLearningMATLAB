@@ -11,7 +11,7 @@ if ~exist("zlimm_want","var")
 end
 rng(0)
 %X0 = randn(500,3);
-alpha_value=0.3;
+alpha_value=0.1;
 sizze=8;
 
 % Figure and axes
