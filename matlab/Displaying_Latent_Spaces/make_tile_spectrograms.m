@@ -48,11 +48,11 @@ for JJ=1:Nsamples
     %%%time-corrected logs without adjustment...
     head=get_GSI_head_info(head_info,fnames{JJ}(3:4),fnames{JJ}(2),fnames{JJ}(5));
     target_time=fnames{JJ}(8:22);
-    tabs_call=datetime(fnames{JJ}(8:22));
+    tabs_call=datetime(fnames{JJ}(8:22));  %%%The filename is the time of the midpoint of the detection.
     target_time(10:end)='000000';
     tsec=seconds(tabs_call-datetime(target_time));
     tsec_shift=tsec*(head.tdrift/86400);
-    tabs_call=tabs_call-duration(0,0,tsec_shift);
+    tabs_call=tabs_call-duration(0,0,tsec_shift);  %%This makes acoustic time match manually-logged time
     
      
     if strcmp(dataset_chc,'manual')

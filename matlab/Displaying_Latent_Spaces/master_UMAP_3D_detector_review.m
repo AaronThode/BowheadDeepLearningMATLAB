@@ -242,9 +242,9 @@ for Idir=1:length(dir_names)
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
     %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
-    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[132 50],zlimm_want);
+    ud=scatter3_limits_with_azel_edits(x_norm,x_color,[132 50],zlimm_want); colormap jet
     
-    colormap jet
+   
 
      myfig=gcf;
 

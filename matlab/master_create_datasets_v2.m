@@ -316,7 +316,7 @@ for Iyear=1:length(year_want)
                 manual.tsec=(tabs_DASAR(Ithis_day)-tabs_start_unique(Iday))*24*3600;
                 manual.tabs=tabs_DASAR(Ithis_day);
                 tdrift_file=head.tdrift;
-                manual.tsec=manual.tsec*(1+head.tdrift/86400);  %This converts manual time into acoustic time...
+                manual.tsec=manual.tsec*(1+head.tdrift/86400);  %This converts manually-logged time into acoustic time...
                
                 manual.duration=manual.ind.duration(Iexist(Ithis_day),Id);
                 manual.tmid=manual.tsec+0.5*manual.duration;
@@ -486,7 +486,7 @@ for Iyear=1:length(year_want)
                         end
                         if write_files
                             output_name=file_array{Ifile_want}(1:(end-4));
-                            tabs_tstartt=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid-detect.tstart(II));
+                            tabs_tstartt=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid-detect.tstart(II));  %%%file name is time of midpoint of spectrogram....
                             tabs_tmid=detect.tstart_abs(II)+datenum(0,0,0,0,0,tmid);
                             temp=datestr(tabs_tstartt,30);
                             output_name(17:end)=temp(10:end);
