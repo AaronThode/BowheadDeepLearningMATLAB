@@ -118,16 +118,20 @@ for Idir=1:length(dir_names)
 
             if rem(II,100)==0,fprintf('%6.2f percent done\n', 100*II/Npp);end
             fname=data.original_filenames{II};
-            if strcmp(dataset_chc,'manual')
-                imgdata=load(sprintf('%s%s%s',images_dir{Idir},filesep,fname));
-            else
-                if strcmp(fname(end-4),'0')
-                    imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fname));
-                else
-                    imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,fname));
-                end
-            end
 
+            try
+                if strcmp(dataset_chc,'manual')
+                    imgdata=load(sprintf('%s%s%s',images_dir{Idir},filesep,fname),'features');
+                else
+                    if strcmp(fname(end-4),'0')
+                        imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fname),'features');
+                    else
+                        imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,fname),'features');
+                    end
+                end
+            catch
+                fprintf('Could not load %s...\n',fname);
+            end
             if II==1
                 feature_names=fieldnames(imgdata.features);
                 for Ifeature=1:length(feature_names)
