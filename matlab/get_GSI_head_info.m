@@ -1,5 +1,5 @@
 function head=get_GSI_head_info(head_info,year,Site,DASAR_ltr)
-
+% year in form of '08'
 
 
 Iyear=find(contains(head_info.year_want,year));

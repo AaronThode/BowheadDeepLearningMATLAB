@@ -1,15 +1,22 @@
 function [SNR_gram,output_array_fin,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
 %function [SNR_gram,output_array_fin,FF,TT,azi]=create_spectrogram_sample(x,Fs,tmid,file_len_sec,spectrogram_len_sec,param,titstr)
-
+% param.Nfft, param.ovlap, param.fmin, param.fmax
+%   x[samples,channel]
+if isempty(param)
+    param.debug=false;
+end
 SNR_gram=[];TT=[];FF=[];azi=[];output_array_fin=[];
 tsec_start=tmid-0.5*file_len_sec;
 Ixx=round(Fs*(tsec_start+[0 file_len_sec]));
 
 Ixx(1)=max([1 (Ixx(1))]);
-Ixx(2)=min([length(x) Ixx(2)])-1;
+Ixx(2)=min([length(x) Ixx(2)]);
 y=x(Ixx(1):Ixx(2),:);  %%signal snippet including background noise
 
-if length(y)~=Fs*file_len_sec  %if snippet from front or end of file.
+if length(y)>round(Fs*file_len_sec)
+    y=y(1:round(Fs*file_len_sec));
+end
+if length(y)~=round(Fs*file_len_sec)  %if snippet from front or end of file.
     disp('File length not right')
     return
 end

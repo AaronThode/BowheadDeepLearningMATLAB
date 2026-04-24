@@ -1,3 +1,4 @@
+1
 %master_UMAP_3D_detector_review.m
 
 
@@ -55,6 +56,7 @@ switch dataset_chc
         %Centered result
 
         Image_database_dir='/Volumes/Maui2025';
+        Image_database_dir='/Volumes/Bowhead_DL_Project/';
         images_dir{1,1}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
         images_dir{1,2}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
 

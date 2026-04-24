@@ -423,11 +423,7 @@ for Iyear=1:length(year_want)
                         param.spec.plot_fmax=detect.fmax(II);
                         param.spec.duration=detect.duration(II);
                         param.spec.debug_max_tmid=1*60;
-                       % if Idet<param.spec.debug_count
-                        %    param.spec.debug_plot=true;
-                        %else
-                        %    param.spec.debug_plot=false;
-                        % end
+                       
 
                         %%%Identify if a whale call
                         if(~isnan(Score{Ichunk}(II,1)))
