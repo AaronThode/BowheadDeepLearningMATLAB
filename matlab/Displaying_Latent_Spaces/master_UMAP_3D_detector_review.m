@@ -1,4 +1,4 @@
-1
+
 %master_UMAP_3D_detector_review.m
 
 
@@ -9,8 +9,19 @@ addpath .
 
 dataset_chc='auto';
 force_UMAP_recompute=false;
-color_label='type';  %%How to label colors in 3D scattering.  'PeakFrequency' or 'type','PeakTime'
-advanced_labels=false;
+force_Labels_recompute=true;
+color_label='type';  %%How to label colors in 3D scattering. 
+% fpeak: 
+%         tpeak:  
+%     duration2:  %Duration estimated by peak-picking image (not accurate)
+%           SNR:  
+%          fmin:  
+%          fmax:  
+%     duration1:  %%%Duration computed from original event detector
+%        dB_RMS:  
+%     magnitude:  
+%           ICI:  
+
 
 %%%UMAP parameters
 addpath ../../../umapAndEppFileExchange_v4_6/umap
@@ -51,12 +62,11 @@ switch dataset_chc
         %%%Revised with everything labeled properly
         clear dir_names
         Database_dir='../../../Bowhead_DL_Project/';
-        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
         dir_names={[Database_dir '/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/']};
         %Centered result
 
         Image_database_dir='/Volumes/Maui2025';
-        Image_database_dir='/Volumes/Bowhead_DL_Project/';
+        %Image_database_dir='/Volumes/Bowhead_DL_Project/';
         images_dir{1,1}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
         images_dir{1,2}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
 
@@ -99,12 +109,13 @@ for Idir=1:length(dir_names)
         x=data.(field_want);
     end
 
-    %%If frequency information not available, load from SNR_gram
-    if advanced_labels & ~isfield(data,'PeakFrequency')
+    %%If stored MAT file does not have features stored in convenient form,
+    %%add it!
+    if force_Labels_recompute || ~isfield(data,'type')
+        disp('Adding feature vectors to MAT file before continuing...');
         Npp=size(x,1);
-        data.PeakFrequency=ones(Npp,1);
-        data.PeakTime=ones(Npp,1);
         for II=1:Npp
+
             if rem(II,100)==0,fprintf('%6.2f percent done\n', 100*II/Npp);end
             fname=data.original_filenames{II};
             if strcmp(dataset_chc,'manual')
@@ -117,13 +128,23 @@ for Idir=1:length(dir_names)
                 end
             end
 
-            [outputs]=extract_features_from_SNRgram(imgdata.dT,imgdata.dF,imgdata.SNR_gram);
-            data.PeakFrequency(II)=outputs.Fmax;
-            data.PeakTime(II)=outputs.Tmax;
+            if II==1
+                feature_names=fieldnames(imgdata.features);
+                for Ifeature=1:length(feature_names)
+                    data.(feature_names{Ifeature})=ones(Npp,1);
+                end
+                    data.type=ones(Npp,1);
+            end
 
-
+            for Ifeature=1:length(feature_names)
+                try
+                    data.(feature_names{Ifeature})(II)=imgdata.features.(feature_names{Ifeature});
+                catch
+                    data.(feature_names{Ifeature})(II)=-1;
+                end
+                data.type(II)=str2double(extract(fname,28));
+            end
         end %%II
-        %save(sprintf('umap_embeddings_%id.mat',UMAP_dim),'PeakTime','PeakFrequency',"-append");
         save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
     end  %Advanced labels
 
@@ -142,7 +163,14 @@ for Idir=1:length(dir_names)
 
     cd(mydir)
 
-    type=str2double(extract(data.original_filenames,28));
+    if isfield(data,'type')
+        disp('Taking call type from data object (preferred)')
+        type=data.type;
+    else
+        disp('Reading call type from file name')
+        type=str2double(extract(data.original_filenames,28));
+        data.type=type;
+    end
 
 
     %%%Create overview plot to help identify where to search for calls.
@@ -173,6 +201,7 @@ for Idir=1:length(dir_names)
                 %%%Detection problem only
                 if ~display_call_classifications
                     type(type>0)=1;
+                    data.type(data.type>0)=1;
                 end
                 switch Jcat
                     case 1
@@ -192,15 +221,17 @@ for Idir=1:length(dir_names)
         % h(Idir,J)=subplot(1,2,J);
         x_norm=(x-mean(x))./std(x);
 
-
-        switch color_label
-            case 'PeakFrequency'
-                x_color=data.PeakFrequency;
-            case 'PeakTime'
-                x_color=data.PeakTime;
-            case 'type'
-                x_color=type;
-        end
+        x_color=data.(color_label);
+        % switch color_label
+        %     case 'fpeak'
+        %         x_color=data.PeakFrequency;
+        %     case 'tpeak'
+        %         x_color=data.PeakTime;
+        %         case 'duration1'
+        %         x_color=data.duration1;
+        %     case 'type'
+        %         x_color=data.type;
+        % end
 
 
         %%%Plot both individually
