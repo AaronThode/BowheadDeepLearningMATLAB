@@ -53,20 +53,21 @@ switch dataset_chc
         %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
 
         %%%Baseline
-        dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
+        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
         %dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
          %Centered result
-        images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir'];
-        images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
+        %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir'];
+        %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
 
         %%%Revised with everything labeled properly
         clear dir_names
-        Database_dir='../../../Bowhead_DL_Project/';
-        dir_names={[Database_dir '/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/']};
+        %Database_dir='../../../Bowhead_DL_Project/';
+        dir_names={[Database_dir 'LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/']};
         %Centered result
 
-        Image_database_dir='/Volumes/Maui2025';
+       % Image_database_dir='/Volumes/Maui2025';
         %Image_database_dir='/Volumes/Bowhead_DL_Project/';
+        Image_database_dir=Database_dir;
         images_dir{1,1}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
         images_dir{1,2}=[Image_database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
 
