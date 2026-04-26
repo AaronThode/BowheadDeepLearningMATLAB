@@ -266,4 +266,3 @@ while ~isempty(JJ)
     JJ=input('Enter a number to see related detections on other DASARS: ');
 
 end
-keyboard

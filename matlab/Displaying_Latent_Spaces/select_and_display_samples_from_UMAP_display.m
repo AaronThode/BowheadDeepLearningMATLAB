@@ -4,18 +4,19 @@ if ~exist('display_sample','var')
     display_sample=true;
 end
 
-Xt=gcf().UserData.Xt;
-
+    
 notready=true;
 while display_sample & notready
     Xt=gcf().UserData.Xt;
+    Igood=gcf().UserData.Igood;
 
     tmp=ginput(2);
     tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
-    Icluster=find(Xt(:,1)>min(tmp(:,1))&Xt(:,1)<max(tmp(:,1)) ...
-        &Xt(:,2)>min(tmp(:,2)) &Xt(:,2)<max(tmp(:,2)) ...
-        &Xt(:,3)>min(tmp(:,3)) &Xt(:,3)<max(tmp(:,3)));
+    Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
+        &Xt(Igood,2)>min(tmp(:,2)) &Xt(Igood,2)<max(tmp(:,2)) ...
+        &Xt(Igood,3)>min(tmp(:,3)) &Xt(Igood,3)<max(tmp(:,3)));
 
+    Icluster=Igood(Icluster);  %Index now relates fo full data set
     temp_fnames=data.original_filenames(Icluster);
     temp_type=type(Icluster);
 

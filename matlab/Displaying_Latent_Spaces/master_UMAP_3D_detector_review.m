@@ -215,6 +215,7 @@ for Idir=1:length(dir_names)
     if isempty(display_sample)
         continue
     end
+
     select_and_display_samples_from_UMAP_display;
 
     clear data
