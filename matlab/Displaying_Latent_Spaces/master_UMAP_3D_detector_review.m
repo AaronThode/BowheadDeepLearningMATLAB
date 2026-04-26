@@ -102,7 +102,7 @@ for Idir=1:length(dir_names)
 
     %%If stored MAT file does not have features stored in convenient form,
     %%add it!
-    if force_labels_recompute || ~isfield(data,'type')
+    if force_labels_recompute || ~isfield(data.features,'type')
         disp('Adding feature vectors to MAT file before continuing...');
         Npp=size(x,1);
         for II=1:Npp
@@ -126,18 +126,18 @@ for Idir=1:length(dir_names)
             if II==1
                 feature_names=fieldnames(imgdata.features);
                 for Ifeature=1:length(feature_names)
-                    data.(feature_names{Ifeature})=ones(Npp,1);
+                    data.features.(feature_names{Ifeature})=ones(Npp,1);
                 end
-                data.type=ones(Npp,1);
+                data.features.type=ones(Npp,1);
             end
 
             for Ifeature=1:length(feature_names)
                 try
-                    data.(feature_names{Ifeature})(II)=imgdata.features.(feature_names{Ifeature});
+                    data.features.(feature_names{Ifeature})(II)=imgdata.features.(feature_names{Ifeature});
                 catch
-                    data.(feature_names{Ifeature})(II)=-1;
+                    data.features.(feature_names{Ifeature})(II)=-1;
                 end
-                data.type(II)=str2double(extract(fname,28));
+                data.features.type(II)=str2double(extract(fname,28));
             end
         end %%II
         save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
@@ -158,27 +158,27 @@ for Idir=1:length(dir_names)
 
     cd(mydir)
 
-    if isfield(data,'type')
+    if isfield(data.features,'type')
         disp('Taking call type from data object (preferred)')
-        type=data.type;
+        type=data.features.type;
     else
         disp('Reading call type from file name, restricted to one-digit labels')
         type=str2double(extract(data.original_filenames,28));
-        data.type=type;
+        data.features.type=type;
     end
     %%% Show binary classification (detection) or all call types
     %%% (classification)?
     if ~display_call_classifications
         type(type>0)=1;
-        data.type(data.type>0)=1;
+        data.features.type(data.features.type>0)=1;
     end
 
 
     x_norm=(x-mean(x))./std(x);
-    x_color=data.(color_label);
+    x_color=data.features.(color_label);
     % switch color_label
     %     case 'fpeak'
-    %         x_color=data.PeakFrequency;
+    %         x_color=data.features.PeakFrequency;
     %     case 'tpeak'
     %         x_color=data.PeakTime;
     %         case 'duration1'
@@ -194,7 +194,7 @@ for Idir=1:length(dir_names)
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
     %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
-    ud=scatter3_GUI_rotate_transparency(x_norm,x_color,[132 50],zlimm_want); colormap jet
+    ud=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[132 50],zlimm_want); colormap jet
 
     myfig=gcf;
 
