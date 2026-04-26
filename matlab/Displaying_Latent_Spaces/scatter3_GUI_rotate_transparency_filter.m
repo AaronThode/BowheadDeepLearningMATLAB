@@ -10,7 +10,7 @@ function ud=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,zli
 
 feature_names=fieldnames(features);
 type=features.(feature_names{end});
-
+Igood=1:size(X0,1);
 
 if ~exist("default_view","var")
     default_view=[];
@@ -26,7 +26,7 @@ sizze=8;
 % Figure and axes
 fig = figure('Name','Scatter3 Limits & Az/El Edits','Units','normalized','Position',[0.05 0.9 0.9 0.9]);
 ax = axes('Parent',fig,'Position',[0.05 0.15 0.75 0.8]);
-h = scatter3(ax,X0(:,1),X0(:,2),X0(:,3),sizze,type,'filled');
+h = scatter3(ax,X0(Igood,1),X0(Igood,2),X0(Igood,3),sizze,type,'filled');
 h.MarkerEdgeAlpha=alpha_value;
 h.MarkerFaceAlpha=alpha_value;
 xlabel('x');ylabel('y');zlabel('z');
@@ -88,43 +88,55 @@ else
     ddFeature = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
         'String',{'<no feature struct>'},'Value',1,'Enable','off');
 end
-% store handle
-ud = fig.UserData;
-ud.ddFeature = ddFeature;
 
-% Dropdown: field field names from 'feature' struct (or variable)
-% Determine field names safely
+% Dropdown: filter field names from 'feature' struct (or variable)
+
 y = y - gap; % position above other controls
-if exist('features','var') && isstruct(features)
-    fnames = fieldnames(features);
-else
-    fnames = {};
-end
+
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Filter Feature','HorizontalAlignment','left');
 if ~isempty(fnames)
-    ddFeature = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
+    ddFilter = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
         'String',fnames,'Value',length(fnames),'Callback',@onFilterSelect);
 else
-    ddFeature = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
+    ddFilter = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
         'String',{'<no feature struct>'},'Value',1,'Enable','off');
 end
 % store handle
-ud = fig.UserData;
-ud.ddFilter = ddFeature;
+sel = fnames{end};
+% store the selected field name for other callbacks to use
 
-% Callback for dropdown (no-op default; user can expand)
+% Two edit boxes to the right of ddFeature with same callback
+edtFeature1 = uicontrol(fig,'Style','edit','Position',[x0+210 y-20 80 22],...
+    'String',num2str(min(features.(sel)),'%3.1f'),'Callback',@onFilterFeatureEdit);
+edtFeature2 = uicontrol(fig,'Style','edit','Position',[x0+300 y-20 80 22],...
+    'String',num2str(max(features.(sel)),'%3.1f'),'Callback',@onFilterFeatureEdit);
+
 
 % Checkbox: transform or change view
 chk = uicontrol(fig,'Style','checkbox','Position',[x0 20 320 20],'String','Rotate coordinates (transform points)','Value',1,'Callback',@onControl);
 
 % Store handles/data
+% store handles
+ud = fig.UserData;
+ud.ddFeature = ddFeature;
+ud.selectedFeatureField = sel;
+
+ud.ddFilter = ddFilter;
+ud.minVal=str2double(edtFeature1.String); 
+ud.maxVal=str2double(edtFeature2.String); 
+ud.edtFeature1 = edtFeature1;
+ud.edtFeature2 = edtFeature2;
+
 ud.X0 = X0; ud.h = h; ud.ax = ax;
+ud.Igood=Igood;
 ud.sldX = sldX; ud.sldY = sldY; ud.sldZ = sldZ;
 ud.edtX = edtX; ud.edtY = edtY; ud.edtZ = edtZ;
 ud.sldAz = sldAz; ud.sldEl = sldEl; ud.edtAz = edtAz; ud.edtEl = edtEl;
 ud.chk = chk;
 ud.sldAlpha = sldAlpha;
 ud.edtAlpha = edtAlpha;
+ud.features=features;
+ud.CData=h.CData;
 fig.UserData = ud;
 
 
@@ -149,27 +161,67 @@ end
 updateDisplay();
 
 % --- Callbacks -------------------------------------------------------
-function onFilterSelect(src,~)
-    udtmp = fig.UserData;
-    idx = get(src,'Value');
-    items = get(src,'String');
-    sel = items{idx};
-    % store the selected field name for other callbacks to use
-    udtmp.selectedFeatureField = sel;
-    disp(sel)
-    fig.UserData = udtmp;
-end
-    
+
+% Callback shared by both feature edit boxes
+    function onFilterFeatureEdit(src,~)
+        udtmp = fig.UserData;
+
+        val = get(src,'String');
+        % store last entered string in UserData for later use
+        if src == udtmp.edtFeature1
+            udtmp.minVal = str2double(val);
+        elseif src == udtmp.edtFeature2
+            udtmp.maxVal = str2double(val);
+        end
+
+        sel=udtmp.selectedFeatureField;
+        udtmp.Igood=find(udtmp.features.(sel)>=udtmp.minVal & ...
+            udtmp.features.(sel)<=udtmp.maxVal);
+
+        warning off
+        doTransform = get(udtmp.chk,'Value');
+        if doTransform
+            set(udtmp.h,'XData',udtmp.Xt(udtmp.Igood,1),'YData',udtmp.Xt(udtmp.Igood,2),'ZData',udtmp.Xt(udtmp.Igood,3));
+        else
+            set(udtmp.h,'XData',udtmp.X0(udtmp.Igood,1),'YData',udtmp.X0(udtmp.Igood,2),'ZData',udtmp.X0(udtmp.Igood,3));
+        end
+        udtmp.h.CData=udtmp.CData(udtmp.Igood);
+        warning on
+        fig.UserData = udtmp;
+    end
+
+    function onFilterSelect(src,~)
+        udtmp = fig.UserData;
+        idx = get(src,'Value');
+        items = get(src,'String');
+        sel = items{idx};
+        % store the selected field name for other callbacks to use
+        udtmp.selectedFeatureField = sel;
+        disp(sel)
+
+        %%%Update edit boxes
+        udtmp.minVal = min(udtmp.features.(sel));
+        udtmp.maxVal = max(udtmp.features.(sel));
+       
+        udtmp.edtFeature1.String=num2str(udtmp.minVal,'%3.1f');
+        udtmp.edtFeature2.String=num2str(udtmp.maxVal,'%3.1f');
+
+        fig.UserData = udtmp;
+        onFilterFeatureEdit(udtmp.edtFeature1);
+    end
+
     function onFeatureSelect(src,~)
-    udtmp = fig.UserData;
-    idx = get(src,'Value');
-    items = get(src,'String');
-    sel = items{idx};
-    % store the selected field name for other callbacks to use
-    udtmp.selectedFeatureField = sel;
-    h.CData=features.(sel);
-    fig.UserData = udtmp;
-end
+        udtmp = fig.UserData;
+        idx = get(src,'Value');
+        items = get(src,'String');
+        sel = items{idx};
+        % store the selected field name for other callbacks to use
+        udtmp.selectedFeatureField = sel;
+        udtmp.CData=features.(sel);
+        h.CData=udtmp.CData(udtmp.Igood);  %%Change color...
+        fig.UserData = udtmp;
+        
+    end
 
     function onAlphaControl(src,~)
         % slider changed -> update edit and scatter alpha
@@ -227,17 +279,18 @@ end
         ud = fig.UserData;
         str = strtrim(get(src,'String'));
         vals = sscanf(str,'%f %f');
-        if numel(vals)==2 && vals(1)if src==ud.edtX
+        if numel(vals)==2 && vals(1)
+            if src==ud.edtX
                 xlim(ud.ax,[vals(1) vals(2)]);
                 set(ud.sldX,'Value',max(abs(vals)));
-        elseif src==ud.edtY
-            ylim(ud.ax,[vals(1) vals(2)]);
-            set(ud.sldY,'Value',max(abs(vals)));
-        else % edtZ
-            zlim(ud.ax,[vals(1) vals(2)]);
-            set(ud.sldZ,'Value',max(abs(vals)));
-        end
-        applyRotationAndView();
+            elseif src==ud.edtY
+                ylim(ud.ax,[vals(1) vals(2)]);
+                set(ud.sldY,'Value',max(abs(vals)));
+            else % edtZ
+                zlim(ud.ax,[vals(1) vals(2)]);
+                set(ud.sldZ,'Value',max(abs(vals)));
+            end
+            applyRotationAndView();
         else
             % Invalid input: revert edit box to current axes limits
             updateEditsFromAxes();
@@ -289,12 +342,12 @@ end
         if doTransform
             R = rotationMatrix(az,el);
             Xt = (R * ud.X0')';
-            set(ud.h,'XData',Xt(:,1),'YData',Xt(:,2),'ZData',Xt(:,3));
+            set(ud.h,'XData',Xt(ud.Igood,1),'YData',Xt(ud.Igood,2),'ZData',Xt(ud.Igood,3));
             % keep camera fixed in transformed-data mode
             view(ud.ax,[0 90]);
             fig.UserData.Xt=Xt;
         else
-            set(ud.h,'XData',ud.X0(:,1),'YData',ud.X0(:,2),'ZData',ud.X0(:,3));
+            set(ud.h,'XData',ud.X0(ud.Igood,1),'YData',ud.X0(ud.Igood,2),'ZData',ud.X0(ud.Igood,3));
             view(ud.ax,[az el]);
         end
         drawnow
