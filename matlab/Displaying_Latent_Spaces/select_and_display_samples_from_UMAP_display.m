@@ -6,7 +6,6 @@ end
 
 Xt=gcf().UserData.Xt;
 
-
 notready=true;
 while display_sample & notready
     Xt=gcf().UserData.Xt;
@@ -42,7 +41,6 @@ while display_sample & notready
         make_tile_spectrograms("Manual",temp_fnames(temp_Imanual),dataset_chc,images_dir,display_NTV);
     end
     make_tile_spectrograms("Auto",temp_fnames(temp_Iauto),dataset_chc,images_dir,display_NTV);
-
 
     notready=input('Enter 1 to make another selection:');
     close(3:length(get(0).Children))
