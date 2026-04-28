@@ -7,8 +7,9 @@ end
     
 notready=true;
 while display_sample & notready
+    figure(1);
     Xt=gcf().UserData.Xt;
-    Igood=gcf().UserData.Igood;
+    Igood=gcf().UserData.Igood;  %%%Points visible on screen (survived filtering)
 
     tmp=ginput(2);
     tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
@@ -40,12 +41,15 @@ while display_sample & notready
     %Iwant=(randperm(length(Icluster),Ncalls));
 
     if display_manual
-        data.features.type=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
-            data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,reviewer_initials,display_NTV);
+        [data.features.type, Ichanged_manual]=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
+            data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,display_NTV);
     end
-    data.features.type=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
-        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,reviewer_initials,display_NTV);
+    [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
+        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,display_NTV);
 
+    Ichanged=unique([Ichanged_manual Ichanged_auto]);
+    data.date_adjusted(Ichanged)=datetime('now');
+    data.reviewer(Ichanged)=reviewer_initials;
     %%%Change UMAP color scheme...
     ud.features.type=data.features.type;
     ud.features.iscall=double(data.features.type>0);

@@ -21,12 +21,13 @@ end
 rng(0)
 %X0 = randn(500,3);
 alpha_value=0.2;  %Initial value for transparency.
-sizze=20;
+sizze=8;
+sizze=10;
 
 % Figure and axes
 fig = figure('Name','Scatter3 Limits & Az/El Edits','Units','normalized','Position',[0.05 0.9 0.9 0.9]);
 ax = axes('Parent',fig,'Position',[0.05 0.15 0.75 0.8]);
-h = scatter3(ax,X0(Igood,1),X0(Igood,2),X0(Igood,3),sizze,type,'filled');
+h = scatter3(ax,X0(Igood,1),X0(Igood,2),X0(Igood,3),sizze,type,"o");
 h.MarkerEdgeAlpha=alpha_value;
 h.MarkerFaceAlpha=alpha_value;
 xlabel('x');ylabel('y');zlabel('z');

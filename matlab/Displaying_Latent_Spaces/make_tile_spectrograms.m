@@ -1,5 +1,6 @@
-function type=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,reviewer_initials,plot_NTV)
+function [type,Ichanged]=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,plot_NTV)
 
+Ichanged=[];
 imgdata_min_freq=25; %Minimum frequency
 spectrogram_window_length=3;
 persistent manual_logs head_info
@@ -233,8 +234,9 @@ prompt = {'Enter a positive integer to review linked DASARs..'};
 dlgtitle = 'Input';
 fieldsize = [1 45];
 definput = {'-1'};
-dummy=input('Rearrange windows and then hit return');
-plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput);
+opts_view_other_window.WindowStyle='normal';
+%dummy=input('Rearrange windows and then hit return');
+plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
    
 JJ=str2double(plot_linked_calls{1});
 while JJ>0  %If user has selected something
@@ -269,8 +271,8 @@ while JJ>0  %If user has selected something
     imagesc(TT,FF,double(imgdata.SNR_gram)/5);colorbar;axis xy;title(fnames{JJ})
     hold on;plot(0.1,imgdata.features.fpeak-imgdata_min_freq,'o','color','w');
     
-    dummy=input('Rearrange windows and then hit return');
-    plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput);
+    %dummy=input('Rearrange windows and then hit return');
+    plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
     JJ=str2double(plot_linked_calls);
     close
 
@@ -278,23 +280,23 @@ end %while answer{1}>0
 
 drawnow
 
-prompt = {'Enter indicies to change [value] or [min max]:','New type:'};
+prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2','New type [11 is unknown call type, 12 is uncertain if call:'};
 dlgtitle = 'Input';
 fieldsize = [1 45; 1 45];
 if strcmpi(FigureName,'manual')
-    definput = {'[0 ]','0'};  %Turning whale call into non-whale call
+    Ndefault=min([30 Nsamples]);
+    definput = {sprintf('1:%i',Ndefault),'0'};  %Turning whale call into non-whale call
 else
-    definput = {'[0 ]','11'};  %Switchin automated detection to unknown call
-
+    definput = {'0','11'};  %Switching automated detection to unknown call
+    
 end
 
-dummy=input('Rearrange windows and then hit return');
-call_review = inputdlg(prompt,dlgtitle,fieldsize,definput);
+%dummy=input('Rearrange windows and then hit return');
+call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
 Iwant=str2num(call_review{1});
 
 while Iwant(1)>0
-    if isscalar(Iwant), Iwant=[Iwant Iwant];end
-    Iwant=Iwant(1):Iwant(2);
+     %Iwant=Iwant(1):Iwant(2);
     new_type=str2double(call_review{2});
 
     %%%Debug comment....
@@ -304,10 +306,12 @@ while Iwant(1)>0
 
     if Iwant(1)>0
         type(Iindex(Iwant))=new_type;
+        Ichanged=unique([Ichanged Iindex(Iwant)]);
+
     end
 
-    dummy=input('Rearrange windows and then hit return');
-    call_review = inputdlg(prompt,dlgtitle,fieldsize,definput);
+    %dummy=input('Rearrange windows and then hit return');
+    call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
     Iwant=str2num(call_review{1});
     
 end
