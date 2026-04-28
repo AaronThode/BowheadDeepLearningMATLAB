@@ -21,7 +21,7 @@ color_label='ICI';  %%How to label colors in 3D scattering plot.
 %        dB_RMS:
 %     magnitude:
 %           ICI:
-display_call_classifications=false;
+%display_call_classifications=false;
 
 dataset_chc='auto';
 force_UMAP_recompute=false;
@@ -39,7 +39,7 @@ save_template=false;
 
 
 %[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
-[latent_space_dir,image_dir,gitpath,gsi_dir] = setUpDatabasePaths;
+[latent_space_dir,image_dir,reviewer_initials,~,gsi_dir] = setUpDatabasePaths;
 
 switch dataset_chc
     case 'manual'
@@ -102,6 +102,21 @@ for Idir=1:length(dir_names)
 
     %%If stored MAT file does not have features stored in convenient form,
     %%add it!
+    %  features is a structure where every field is a vector with same
+    %  number of elements as data.x.
+    %  The call type is stored in several ways:
+    %       data.feature.type_org are the original labels before review.
+    %           Always has full classification labels, never alterable by
+    %           reviewers.
+    %       data.feature.type     are the labels after review (cleaned data set)
+    %           Always has full classification labels.
+     %       gcf().UserData.CData:  subset of samples being plotted.
+    %   Related structures:
+    %       data.date_adjusted:   datetime of when data.feature.type was
+    %                           altered
+    %       data.reviewer:  e.g.. 'AT', initials of reviewer.
+
+
     if force_labels_recompute || ~isfield(data.features,'type')
         disp('Adding feature vectors to MAT file before continuing...');
         Npp=size(x,1);
@@ -140,8 +155,15 @@ for Idir=1:length(dir_names)
                 data.features.type(II)=str2double(extract(fname,28));
             end
         end %%II
+        data.features.type_org=data.features.type;
+        data.date_adjusted=repmat(datetime('now'),length(data.features.type),1);
+        data.reviewer=repmat("XX",length(data.features.type),1);
+
         save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
     end  %Advanced labels
+
+    data.features.iscall=(data.features.type>0);
+    
 
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
@@ -158,34 +180,8 @@ for Idir=1:length(dir_names)
 
     cd(mydir)
 
-    if isfield(data.features,'type')
-        disp('Taking call type from data object (preferred)')
-        type=data.features.type;
-    else
-        disp('Reading call type from file name, restricted to one-digit labels')
-        type=str2double(extract(data.original_filenames,28));
-        data.features.type=type;
-    end
-    %%% Show binary classification (detection) or all call types
-    %%% (classification)?
-    if ~display_call_classifications
-        type(type>0)=1;
-        data.features.type(data.features.type>0)=1;
-    end
-
-
     x_norm=(x-mean(x))./std(x);
     x_color=data.features.(color_label);
-    % switch color_label
-    %     case 'fpeak'
-    %         x_color=data.features.PeakFrequency;
-    %     case 'tpeak'
-    %         x_color=data.PeakTime;
-    %         case 'duration1'
-    %         x_color=data.duration1;
-    %     case 'type'
-    %         x_color=data.type;
-    % end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%Plot all detections with UI controls%%%
@@ -194,7 +190,7 @@ for Idir=1:length(dir_names)
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
     %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
-    ud=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[132 50],zlimm_want); colormap jet
+    ud=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[60 90],zlimm_want); colormap jet
 
     myfig=gcf;
 
@@ -218,6 +214,7 @@ for Idir=1:length(dir_names)
 
     select_and_display_samples_from_UMAP_display;
 
-    clear data
+    %clear data
+    keyboard
     cd(mydir)
 end

@@ -1,4 +1,4 @@
-function make_tile_spectrograms(FigureName,fnames,dataset_chc,images_dir,plot_NTV)
+function type=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,reviewer_initials,plot_NTV)
 
 imgdata_min_freq=25; %Minimum frequency
 spectrogram_window_length=3;
@@ -29,7 +29,8 @@ end
 spectrogram_duration=3;  %seconds
 separation_distance=[0 7 7 7*sqrt(3) 14 7*sqrt(7) 21];  %Distance between DASARs in km
 
-fnames=sort(fnames);  %Sort by alphabetical order to group by site and year
+[fnames,Isort]=sort(fnames);  %Sort by alphabetical order to group by site and year
+Iindex=Iindex(Isort);
 Nsamples=length(fnames);
 
 figure(Name=FigureName);set(gcf,'Position',[ 11          60        1745         874  ]);
@@ -113,8 +114,6 @@ for JJ=1:Nsamples
             type_color='y';
         end
 
-
-
     else
         min(minn)
     end
@@ -139,8 +138,8 @@ for JJ=1:Nsamples
         call_cand.ctimes=manual_logs.manual_data{Isite,Iyear}.ind.ctime(II,:)+time_zone_offset;  %Time of call reception at target DASAR
 
         %%%Test 1, are any manual calls within possible timing range
-         Ndasar=sum(~isnan(call_events.ctimes(II,:)));
-       
+        Ndasar=sum(~isnan(call_events.ctimes(II,:)));
+
         Isep=abs((1:7)-Iletter)+1;
         possible_matches=abs(call_cand.ctimes-ctime_call)./(1.5*separation_distance(Isep)/1.5);
         frequency_test=call_cand.flows<imgdata.features.fpeak & call_cand.fhighs > imgdata.features.fpeak;
@@ -148,7 +147,7 @@ for JJ=1:Nsamples
         match_score(2,K)=sum(frequency_test&(possible_matches<1))./Ndasar;  %Don't count myself because it will be a NaN
 
         %%%Test 2: use location to estimate timing of other call
-       delta_ctime=abs(predicted_ctimes(II,:)-call_events.ctimes(II,:))<spectrogram_window_length*5/3;
+        delta_ctime=abs(predicted_ctimes(II,:)-call_events.ctimes(II,:))<spectrogram_window_length*5/3;
         match_score(3,K)=sum(frequency_test&delta_ctime)./Ndasar;
 
         delta_ctime=abs(predicted_ctimes(II,:)-call_events.ctimes(II,:));
@@ -167,7 +166,7 @@ for JJ=1:Nsamples
             match_score_all(K)=max(match_score(K,:));
         end
     end
-   
+
 
     %manual_logs.manual_data{Isite,Iyear}.localized.wctype(Ipossible_manual_call);
 
@@ -230,15 +229,23 @@ for JJ=1:Nsamples
 end %JJ
 
 %%%Plot manual detections closest to this detectio across all DASARS....
+prompt = {'Enter a positive integer to review linked DASARs..'};
+dlgtitle = 'Input';
+fieldsize = [1 45];
+definput = {'-1'};
+dummy=input('Rearrange windows and then hit return');
+plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput);
+   
+JJ=str2double(plot_linked_calls{1});
+while JJ>0  %If user has selected something
 
-JJ=input('Enter a number to see related detections on other DASARS: ');
-while ~isempty(JJ)
+
     %%%Option to plot spectrograms of all linked manual detections
     Isite=str2num(fnames{JJ}(2));
     Iyear=str2num(fnames{JJ}(3:4))-7;
     plot_manual_detection_allDASARs(fnames{JJ},manual_logs.manual_data{Isite,Iyear}.ind,time_zone_offset,head_info,Ibest_this_DASAR(JJ));
-    
-     if strcmp(dataset_chc,'manual')
+
+    if strcmp(dataset_chc,'manual')
         imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)}));
     else
         try
@@ -261,8 +268,46 @@ while ~isempty(JJ)
     TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
     imagesc(TT,FF,double(imgdata.SNR_gram)/5);colorbar;axis xy;title(fnames{JJ})
     hold on;plot(0.1,imgdata.features.fpeak-imgdata_min_freq,'o','color','w');
-    pause;
+    
+    dummy=input('Rearrange windows and then hit return');
+    plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput);
+    JJ=str2double(plot_linked_calls);
+    close
 
-    JJ=input('Enter a number to see related detections on other DASARS: ');
+end %while answer{1}>0
 
+drawnow
+
+prompt = {'Enter indicies to change [value] or [min max]:','New type:'};
+dlgtitle = 'Input';
+fieldsize = [1 45; 1 45];
+if strcmpi(FigureName,'manual')
+    definput = {'[0 ]','0'};  %Turning whale call into non-whale call
+else
+    definput = {'[0 ]','11'};  %Switchin automated detection to unknown call
+
+end
+
+dummy=input('Rearrange windows and then hit return');
+call_review = inputdlg(prompt,dlgtitle,fieldsize,definput);
+Iwant=str2num(call_review{1});
+
+while Iwant(1)>0
+    if isscalar(Iwant), Iwant=[Iwant Iwant];end
+    Iwant=Iwant(1):Iwant(2);
+    new_type=str2double(call_review{2});
+
+    %%%Debug comment....
+    for K=1:length(Iwant)
+        fprintf('%s type %i changed to type %i...\n',fnames{Iwant(K)},type(Iindex(Iwant(K))),new_type);
+    end
+
+    if Iwant(1)>0
+        type(Iindex(Iwant))=new_type;
+    end
+
+    dummy=input('Rearrange windows and then hit return');
+    call_review = inputdlg(prompt,dlgtitle,fieldsize,definput);
+    Iwant=str2num(call_review{1});
+    
 end

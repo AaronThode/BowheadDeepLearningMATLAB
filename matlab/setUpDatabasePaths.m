@@ -1,4 +1,4 @@
-function [latent_space_dir,image_dir,gitpath,gsi_dir] = setUpDatabasePaths
+function [latent_space_dir,image_dir,review_initials,gitpath,gsi_dir] = setUpDatabasePaths
 % set up paths depending on what system I'm using
 % latent_space_dir: base directory where all network weights and latent
 %   space samples are stored
@@ -12,6 +12,12 @@ success=false;
 
 [~,hostname] = system('hostname');
 [~,user_name]=system('whoami');
+
+ if strcmpi(deblank(user_name),'thode')
+     review_initials='AT';
+ elseif strcmpi(deblank(user_name),'oboulais')
+     review_initials='OB';
+ end
 switch hostname(1:end-1)
 
     case 'ishmael.ucsd.edu'
@@ -33,9 +39,16 @@ switch hostname(1:end-1)
             image_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/';
 
         else
-            disp('Using external Thode_AI_Working_Disk for latent space...CANNOT review images...')
+            disp('Using internal laptop storage for latent space.')
             latent_space_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Bowhead_DL_Project/LD32/';
 
+            %%%Check if external server mounted for images
+            if exist('/Volumes/Bowhead_DL_Project/','dir')==7
+                image_dir='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/';
+            else
+                disp('WARNING!  CANNOT DISPLAY IMAGES....')
+
+            end
         end
         success=true;
 end

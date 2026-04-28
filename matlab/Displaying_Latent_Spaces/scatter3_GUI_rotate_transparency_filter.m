@@ -21,7 +21,7 @@ end
 rng(0)
 %X0 = randn(500,3);
 alpha_value=0.2;  %Initial value for transparency.
-sizze=8;
+sizze=20;
 
 % Figure and axes
 fig = figure('Name','Scatter3 Limits & Az/El Edits','Units','normalized','Position',[0.05 0.9 0.9 0.9]);
@@ -185,7 +185,7 @@ updateDisplay();
         else
             set(udtmp.h,'XData',udtmp.X0(udtmp.Igood,1),'YData',udtmp.X0(udtmp.Igood,2),'ZData',udtmp.X0(udtmp.Igood,3));
         end
-        udtmp.h.CData=udtmp.CData(udtmp.Igood);
+        udtmp.h.CData=double(udtmp.CData(udtmp.Igood));
         warning on
         fig.UserData = udtmp;
     end
@@ -217,8 +217,8 @@ updateDisplay();
         sel = items{idx};
         % store the selected field name for other callbacks to use
         udtmp.selectedFeatureField = sel;
-        udtmp.CData=features.(sel);
-        h.CData=udtmp.CData(udtmp.Igood);  %%Change color...
+        udtmp.CData=udtmp.features.(sel);
+        udtmp.h.CData=double(udtmp.CData(udtmp.Igood));  %%Change color...
         fig.UserData = udtmp;
         
     end

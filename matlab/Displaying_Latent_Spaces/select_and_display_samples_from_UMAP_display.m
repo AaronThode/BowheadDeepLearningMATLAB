@@ -17,8 +17,9 @@ while display_sample & notready
         &Xt(Igood,3)>min(tmp(:,3)) &Xt(Igood,3)<max(tmp(:,3)));
 
     Icluster=Igood(Icluster);  %Index now relates fo full data set
+
     temp_fnames=data.original_filenames(Icluster);
-    temp_type=type(Icluster);
+    temp_type=data.features.type(Icluster);  %%Note that edited calls will be used here...
 
     temp_Imanual=find(temp_type>0);
     temp_Iauto=find(temp_type==0);
@@ -39,10 +40,24 @@ while display_sample & notready
     %Iwant=(randperm(length(Icluster),Ncalls));
 
     if display_manual
-        make_tile_spectrograms("Manual",temp_fnames(temp_Imanual),dataset_chc,images_dir,display_NTV);
+        data.features.type=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
+            data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,reviewer_initials,display_NTV);
     end
-    make_tile_spectrograms("Auto",temp_fnames(temp_Iauto),dataset_chc,images_dir,display_NTV);
+    data.features.type=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
+        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,reviewer_initials,display_NTV);
 
+    %%%Change UMAP color scheme...
+    ud.features.type=data.features.type;
+    ud.features.iscall=double(data.features.type>0);
+
+    figure(1);
+    hhh=gcf();
+    hhh.UserData.features.type=data.features.type;
+    hhh.UserData.features.iscall=double(ud.features.iscall);
+    if strcmpi(ud.selectedFeatureField,'iscall')
+        ud.h.CData=double(ud.features.iscall);
+        ud.CData=ud.h.CData;
+    end
     notready=input('Enter 1 to make another selection:');
     close(3:length(get(0).Children))
 end
