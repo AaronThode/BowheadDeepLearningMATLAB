@@ -27,7 +27,7 @@ sizze=10;
 % Figure and axes
 fig = figure('Name','Scatter3 Limits & Az/El Edits','Units','normalized','Position',[0.05 0.9 0.9 0.9]);
 ax = axes('Parent',fig,'Position',[0.05 0.15 0.75 0.8]);
-h = scatter3(ax,X0(Igood,1),X0(Igood,2),X0(Igood,3),sizze,type,"o");
+h = scatter3(ax,X0(Igood,1),X0(Igood,2),X0(Igood,3),sizze,type,"o","filled");
 h.MarkerEdgeAlpha=alpha_value;
 h.MarkerFaceAlpha=alpha_value;
 xlabel('x');ylabel('y');zlabel('z');
@@ -94,7 +94,7 @@ end
 
 y = y - gap; % position above other controls
 
-uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Filter Feature','HorizontalAlignment','left');
+ddFilter_text=uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Filter Feature','HorizontalAlignment','left');
 if ~isempty(fnames)
     ddFilter = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
         'String',fnames,'Value',length(fnames),'Callback',@onFilterSelect);
@@ -123,6 +123,7 @@ ud.ddFeature = ddFeature;
 ud.selectedFeatureField = sel;
 
 ud.ddFilter = ddFilter;
+ud.ddFilter_text=ddFilter_text;
 ud.minVal=str2double(edtFeature1.String); 
 ud.maxVal=str2double(edtFeature2.String); 
 ud.edtFeature1 = edtFeature1;
@@ -187,6 +188,8 @@ updateDisplay();
             set(udtmp.h,'XData',udtmp.X0(udtmp.Igood,1),'YData',udtmp.X0(udtmp.Igood,2),'ZData',udtmp.X0(udtmp.Igood,3));
         end
         udtmp.h.CData=double(udtmp.CData(udtmp.Igood));
+        
+        udtmp.ddFilter_text.String=sprintf('Filter Feature %i samples',length(udtmp.Igood));
         warning on
         fig.UserData = udtmp;
     end

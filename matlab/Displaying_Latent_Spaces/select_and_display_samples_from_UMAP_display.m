@@ -7,10 +7,11 @@ end
     
 notready=true;
 while display_sample & notready
+    drawnow
     figure(1);
     Xt=gcf().UserData.Xt;
     Igood=gcf().UserData.Igood;  %%%Points visible on screen (survived filtering)
-
+                        %Is this the same as ud.Igood
     tmp=ginput(2);
     tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
     Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
@@ -40,13 +41,19 @@ while display_sample & notready
     %Ncalls=min([30 length(Icluster)]);
     %Iwant=(randperm(length(Icluster),Ncalls));
 
-    if display_manual
+    Ichanged_manual=[];
+    if display_manual& ~isempty(temp_Imanual)
         [data.features.type, Ichanged_manual]=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
             data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,display_NTV);
     end
-    [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
-        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,display_NTV);
 
+    Ichanged_auto=[];
+    if ~isempty(temp_Iauto)
+        [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
+            data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,display_NTV);
+    end
+    close(2:length(get(0).Children))
+    
     Ichanged=unique([Ichanged_manual Ichanged_auto]);
     data.date_adjusted(Ichanged)=datetime('now');
     data.reviewer(Ichanged)=reviewer_initials;
@@ -55,13 +62,23 @@ while display_sample & notready
     ud.features.iscall=double(data.features.type>0);
 
     figure(1);
-    hhh=gcf();
-    hhh.UserData.features.type=data.features.type;
-    hhh.UserData.features.iscall=double(ud.features.iscall);
+   % hhh=gcf();
+   % hhh.UserData.features.type=data.features.type;
+   % hhh.UserData.features.iscall=double(ud.features.iscall);
+
+   
+       
     if strcmpi(ud.selectedFeatureField,'iscall')
-        ud.h.CData=double(ud.features.iscall);
-        ud.CData=ud.h.CData;
+        Igood=find(ud.features.iscall>0);
+        ud.Igood=Igood;
+        warning off
+        set(ud.h,'XData',Xt(ud.Igood,1),'YData',Xt(ud.Igood,2),'ZData',Xt(ud.Igood,3),'CData',double(ud.CData(ud.Igood)));
+       % set(ud.h,'CData',double(ud.CData(ud.Igood)));
+        warning on
+
     end
+    
+    set(gcf,'UserData',ud);
     notready=input('Enter 1 to make another selection:');
-    close(3:length(get(0).Children))
+    
 end

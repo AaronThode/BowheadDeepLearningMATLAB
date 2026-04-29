@@ -229,18 +229,29 @@ for JJ=1:Nsamples
     end %I
 end %JJ
 
-%%%Plot manual detections closest to this detectio across all DASARS....
-prompt = {'Enter a positive integer to review linked DASARs..'};
-dlgtitle = 'Input';
-fieldsize = [1 45];
-definput = {'-1'};
-opts_view_other_window.WindowStyle='normal';
-%dummy=input('Rearrange windows and then hit return');
-plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
-   
-JJ=str2double(plot_linked_calls{1});
-while JJ>0  %If user has selected something
 
+%%%%General input box window for call review...
+prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2', ...
+    'New type [11 is unknown call type, 12 is uncertain if call:', ...
+    'Enter an index to review linked DASARs..'};
+dlgtitle = 'Input';
+fieldsize = [1 45; 1 45; 1 30];
+if strcmpi(FigureName,'manual')
+    Ndefault=min([30 Nsamples]);
+    Ndefault=Nsamples;
+    definput = {sprintf('1:%i',Ndefault),'0','-1'};  %Turning whale call into non-whale call
+else
+    definput = {'0','11','-1'};  %Switching automated detection to unknown call
+
+end
+opts_view_other_window.WindowStyle='normal';
+
+call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+
+
+%%%%%Review manual DASARs near a detection if desired
+JJ=str2double(call_review{3});
+while JJ>0  %If user has selected something
 
     %%%Option to plot spectrograms of all linked manual detections
     Isite=str2num(fnames{JJ}(2));
@@ -272,27 +283,21 @@ while JJ>0  %If user has selected something
     hold on;plot(0.1,imgdata.features.fpeak-imgdata_min_freq,'o','color','w');
     
     %dummy=input('Rearrange windows and then hit return');
-    plot_linked_calls = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
-    JJ=str2double(plot_linked_calls);
+    %%%Plot manual detections closest to this detection across all DASARS....
+    prompt1 = {'Enter a positive integer to review linked DASARs..'};
+    dlgtitle1 = 'More linked DASARs?';
+    fieldsize1 = [1 45];
+    definput1 = {'-1'};
+    %dummy=input('Rearrange windows and then hit return');
+    plot_linked_calls = inputdlg(prompt1,dlgtitle1,fieldsize1,definput1,opts_view_other_window);
+    JJ=str2double(plot_linked_calls{1});
     close
 
-end %while answer{1}>0
+end %while JJ>0
 
+
+%%%%Reassign labels if desired
 drawnow
-
-prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2','New type [11 is unknown call type, 12 is uncertain if call:'};
-dlgtitle = 'Input';
-fieldsize = [1 45; 1 45];
-if strcmpi(FigureName,'manual')
-    Ndefault=min([30 Nsamples]);
-    definput = {sprintf('1:%i',Ndefault),'0'};  %Turning whale call into non-whale call
-else
-    definput = {'0','11'};  %Switching automated detection to unknown call
-    
-end
-
-%dummy=input('Rearrange windows and then hit return');
-call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
 Iwant=str2num(call_review{1});
 
 while Iwant(1)>0
@@ -306,7 +311,11 @@ while Iwant(1)>0
 
     if Iwant(1)>0
         type(Iindex(Iwant))=new_type;
-        Ichanged=unique([Ichanged Iindex(Iwant)]);
+        try
+        Ichanged=unique([Ichanged; Iindex(Iwant)]);
+        catch
+            keyboard
+        end
 
     end
 

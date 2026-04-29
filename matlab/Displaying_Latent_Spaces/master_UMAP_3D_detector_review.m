@@ -2,7 +2,7 @@
 %master_UMAP_3D_detector_review.m
 
 
-%close all
+close all
 clear all
 addpath ..
 addpath .
