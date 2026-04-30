@@ -27,6 +27,8 @@ dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
 display_manual=true;  %If true, plot spectrogram images of known manual calls
+display_auto=false;  %If true, plot spectrogram images of known manual calls
+
 display_NTV=false;
 
 
@@ -190,7 +192,7 @@ for Idir=1:length(dir_names)
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
     %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
-    ud=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
+    [fig_handle]=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
 
     myfig=gcf;
 

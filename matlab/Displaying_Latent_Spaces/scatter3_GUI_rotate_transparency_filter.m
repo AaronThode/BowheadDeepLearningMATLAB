@@ -1,7 +1,7 @@
 
 
 
-function ud=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,zlimm_want)
+function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,zlimm_want)
 % Scatter3 with independent X,Y,Z sliders + edit boxes for axis limits
 % and edit boxes for Azimuth and Elevation
 % Alpha (transparency) slider + edit
