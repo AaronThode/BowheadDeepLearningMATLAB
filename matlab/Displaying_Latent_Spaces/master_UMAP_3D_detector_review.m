@@ -217,6 +217,6 @@ for Idir=1:length(dir_names)
     select_and_display_samples_from_UMAP_display;
 
     %clear data
-    keyboard
+    
     cd(mydir)
 end

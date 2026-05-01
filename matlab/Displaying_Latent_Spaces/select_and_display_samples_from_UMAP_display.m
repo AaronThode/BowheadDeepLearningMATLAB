@@ -8,7 +8,7 @@ notready=true;
 while display_sample & notready
 
     drawnow
-    figure(1);
+    figure(myfig);
     ud=myfig.UserData;
     Xt=ud.Xt;
     Igood=ud.Igood;  %%%Points visible on screen (survived filtering)
@@ -78,7 +78,7 @@ while display_sample & notready
     if strcmpi(ud.selectedFeatureField,'iscall')
         Igood=find(ud.features.iscall>0);
         ud.Igood=Igood;
-        data.features.Igood=Igood;
+        data.Igood=Igood;
         set(myfig,'UserData',ud);
 
         fhandle=myfig.UserData.edtFeature1.Callback;
