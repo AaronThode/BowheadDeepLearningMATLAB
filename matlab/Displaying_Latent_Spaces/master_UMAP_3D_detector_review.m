@@ -41,7 +41,7 @@ save_template=false;
 
 
 %[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
-[latent_space_dir,image_dir,reviewer_initials,~,gsi_dir] = setUpDatabasePaths;
+[latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
 
 switch dataset_chc
     case 'manual'

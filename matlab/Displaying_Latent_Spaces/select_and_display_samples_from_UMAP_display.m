@@ -42,13 +42,13 @@ drawnow
 Ichanged_manual=[];
 if display_manual& ~isempty(temp_Imanual)
     [data.features.type, Ichanged_manual]=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
-        data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,gsi_dir,display_NTV);
+        data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,manual_file,gsi_dir,display_NTV);
 end
 
 Ichanged_auto=[];
 if display_auto & ~isempty(temp_Iauto)
     [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
-        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,gsi_dir,display_NTV);
+        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,manual_file,gsi_dir,display_NTV);
 end
 % close(2:length(get(0).Children))
 

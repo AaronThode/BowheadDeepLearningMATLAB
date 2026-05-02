@@ -1,14 +1,17 @@
-function [latent_space_dir,image_dir,review_initials,gitpath,gsi_dir] = setUpDatabasePaths
+function [latent_space_dir,image_dir,review_initials,manual_file,gsi_dir] = setUpDatabasePaths
 % set up paths depending on what system I'm using
 % latent_space_dir: base directory where all network weights and latent
 %   space samples are stored
 % image_dir:  directory where unsupervised image databases are stored.
 % gsi_dir:    directory where the audio files are stored...
+% manual_file:  Where the MATLAB-converted Greeneridge manual data file
+%           'All_manual_results.mat' is located--full-path file name
 % gitpath: directory of GIT repo sio_research
 
 
-gsi_dir=[];image_dir=[];latent_space_dir=[];gitpath=[];
+gsi_dir=[];image_dir=[];latent_space_dir=[];gitpath=[];manual_file=[];
 success=false;
+
 
 [~,hostname] = system('hostname');
 [~,user_name]=system('whoami');
@@ -41,6 +44,9 @@ switch hostname(1:end-1)
     otherwise
         fprintf('Using Aaron''s local laptop\n')
         gitpath = '/Users/thode/Desktop/ThodeLab';
+
+        manual_file='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Shell_Manual_Results';
+        manual_file=[manual_file filesep 'All_manual_results.mat'];
 
         %%%Check if GSI data available
         gsi_dir='/Volumes/Shared/Data/';

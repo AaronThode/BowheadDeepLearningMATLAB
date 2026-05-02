@@ -1,11 +1,9 @@
-function [type,Ichanged]=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,GSI_file_dir,plot_NTV)
+function [type,Ichanged]=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,manual_file,GSI_file_dir,plot_NTV)
 
 Ichanged=[];
 imgdata_min_freq=25; %Minimum frequency
 spectrogram_window_length=3;
 persistent manual_logs head_info
-manual_file='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Shell_Manual_Results';
-manual_file=[manual_file filesep 'All_manual_results.mat'];
 
 if isempty(manual_logs)
     disp('make_tile_spectrogram: Loading manual data...');
@@ -14,7 +12,7 @@ end
 
 if isempty(head_info)
     disp('make_tile_spectrogram: Loading head info...');
-    head_info=load('/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software/matlab/GSI_header_table.mat');
+    head_info=load('../GSI_header_table.mat');
 end
 if ~exist('plot_NTV','var')
     plot_NTV=true;
