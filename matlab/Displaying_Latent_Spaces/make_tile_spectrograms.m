@@ -1,5 +1,6 @@
 function [type,Ichanged]=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,manual_file,GSI_file_dir,plot_NTV)
 
+%%%Ichanged indicies refer to the same vectors as Iindex.
 Ichanged=[];
 imgdata_min_freq=25; %Minimum frequency
 spectrogram_window_length=3;
@@ -291,7 +292,7 @@ while Iwant(1)>0
     if Iwant(1)>0
         type(Iindex(Iwant))=new_type;
         try
-            Ichanged=unique([Ichanged; Iindex(Iwant)]);
+            Ichanged=unique([Ichanged; Iindex(Iwant)]);  
         catch
             keyboard
         end

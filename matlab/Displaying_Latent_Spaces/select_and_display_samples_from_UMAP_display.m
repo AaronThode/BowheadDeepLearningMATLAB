@@ -18,6 +18,12 @@ Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
 
 Icluster=Igood(Icluster);  %Index now relates fo full data set
 
+%%%Don''t count recent edits...
+N_all_subsamples=length(Icluster);
+Inot_recent=find((datetime("now")-data.date_adjusted(Icluster))>hours(hours_to_exclude_recent_edits));
+
+Icluster=Icluster(Inot_recent);  %Index now relates fo full data set
+
 temp_fnames=data.original_filenames(Icluster);
 temp_type=data.features.type(Icluster);  %%Note that edited calls will be used here...
 
@@ -26,8 +32,8 @@ temp_Iauto=find(temp_type==0);
 
 N_manual=length(temp_Imanual);
 N_unmarked=length(temp_Iauto);
-fprintf('Out of %i detections there are %i manual calls and %i unmarked signals in this sample \n', ...
-    length(Icluster),N_manual,N_unmarked);
+fprintf('Out of %i original detections %i have not already been edited... \n\t Of those remaining there are %i manual calls and %i unmarked signals in this sample \n', ...
+    N_all_subsamples,length(Icluster),N_manual,N_unmarked);
 
 %Display manual examples
 hh=ud.ax;
@@ -49,6 +55,7 @@ Ichanged_auto=[];
 if display_auto & ~isempty(temp_Iauto)
     [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
         data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,manual_file,gsi_dir,display_NTV);
+    
 end
 % close(2:length(get(0).Children))
 
@@ -60,9 +67,12 @@ for f = figgs.'
 end
 clear figgs f
 
-Ichanged=unique([Ichanged_manual Ichanged_auto]);
-data.date_adjusted(Ichanged)=datetime('now');
-data.reviewer(Ichanged)=reviewer_initials;
+%%%Ireviewed are indicies that have been reviewed,
+%%% Ichanged are indicies that have been changed...
+Ireviewed=unique([Icluster(temp_Imanual) Icluster(temp_Iauto)]);
+%Ichanged=unique([Ichanged_manual Ichanged_auto]);
+data.date_adjusted(Ireviewed)=datetime('now');
+data.reviewer(Ireviewed)=reviewer_initials;
 
 %%%Change type and iscall features
 ud.features.type=data.features.type;

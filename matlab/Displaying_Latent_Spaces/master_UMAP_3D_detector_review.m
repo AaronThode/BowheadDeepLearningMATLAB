@@ -26,9 +26,11 @@ color_label='ICI';  %%How to label colors in 3D scattering plot.
 dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
+
+hours_to_exclude_recent_edits=24;  %exclude editing previously edited
+                    %   samples if they were made less than XX hours agao
 display_manual=false;  %If true, plot spectrogram images of known manual calls
 display_auto=true;  %If true, plot spectrogram images of known manual calls
-
 display_NTV=false;
 
 
