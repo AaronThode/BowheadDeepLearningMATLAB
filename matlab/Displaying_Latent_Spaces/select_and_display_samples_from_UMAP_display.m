@@ -1,107 +1,86 @@
 %%%select_and_display_samples_from_UMAP_display.m
 
-if ~exist('display_sample','var')
-    display_sample=true;
+figure(myfig);
+ud=myfig.UserData;
+Xt=ud.Xt;  %%Figure might have been rotated after selection, so need to update...
+Igood=ud.Igood;  %%%Points visible on screen (survived filtering)
+
+%%%Check that length of Igood matches points on screen
+if (length(Igood)~=length(ud.h.CData)) | (length(Igood) ~= length(ud.h.XData))
+    keyboard
 end
 
-notready=true;
-while display_sample & notready
+tmp=ginput(2);
+tmp(:,3)=str2num(ud.edtZ.String)';
+Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
+    &Xt(Igood,2)>min(tmp(:,2)) &Xt(Igood,2)<max(tmp(:,2)) ...
+    &Xt(Igood,3)>min(tmp(:,3)) &Xt(Igood,3)<max(tmp(:,3)));
 
-    
-    figure(myfig);
-    ud=myfig.UserData;
-    Xt=ud.Xt;  %%Figure might have been rotated after selection, so need to update...
-    Igood=ud.Igood;  %%%Points visible on screen (survived filtering)
+Icluster=Igood(Icluster);  %Index now relates fo full data set
 
-    %%%Check that length of Igood matches points on screen
-    if (length(Igood)~=length(ud.h.CData)) | (length(Igood) ~= length(ud.h.XData))
-        keyboard
-    end
+temp_fnames=data.original_filenames(Icluster);
+temp_type=data.features.type(Icluster);  %%Note that edited calls will be used here...
 
-    tmp=ginput(2);
-    tmp(:,3)=str2num(ud.edtZ.String)';
-    Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
-        &Xt(Igood,2)>min(tmp(:,2)) &Xt(Igood,2)<max(tmp(:,2)) ...
-        &Xt(Igood,3)>min(tmp(:,3)) &Xt(Igood,3)<max(tmp(:,3)));
+temp_Imanual=find(temp_type>0);
+temp_Iauto=find(temp_type==0);
 
-    Icluster=Igood(Icluster);  %Index now relates fo full data set
+N_manual=length(temp_Imanual);
+N_unmarked=length(temp_Iauto);
+fprintf('Out of %i detections there are %i manual calls and %i unmarked signals in this sample \n', ...
+    length(Icluster),N_manual,N_unmarked);
 
-    temp_fnames=data.original_filenames(Icluster);
-    temp_type=data.features.type(Icluster);  %%Note that edited calls will be used here...
+%Display manual examples
+hh=ud.ax;
+hh.Title.String=sprintf('%i Samples in range, %i manual, %i auto', ...
+    length(Icluster),N_manual,N_unmarked);
+hh.Title.FontWeight="bold";
+hh.Title.FontSize=14;
+drawnow
+%Ncalls=min([30 length(Icluster)]);
+%Iwant=(randperm(length(Icluster),Ncalls));
 
-    temp_Imanual=find(temp_type>0);
-    temp_Iauto=find(temp_type==0);
-
-    N_manual=length(temp_Imanual);
-    N_unmarked=length(temp_Iauto);
-    fprintf('Out of %i detections there are %i manual calls and %i unmarked signals in this sample \n', ...
-        length(Icluster),N_manual,N_unmarked);
-
-    %Display manual examples
-    hh=ud.ax;
-    hh.Title.String=sprintf('%i Samples in range, %i manual, %i auto', ...
-        length(Icluster),N_manual,N_unmarked);
-    hh.Title.FontWeight="bold";
-    hh.Title.FontSize=14;
-    drawnow
-    %Ncalls=min([30 length(Icluster)]);
-    %Iwant=(randperm(length(Icluster),Ncalls));
-
-    Ichanged_manual=[];
-    if display_manual& ~isempty(temp_Imanual)
-        [data.features.type, Ichanged_manual]=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
-            data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,display_NTV);
-    end
-
-    Ichanged_auto=[];
-    if display_auto & ~isempty(temp_Iauto)
-        [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
-            data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,display_NTV);
-    end
-   % close(2:length(get(0).Children))
-
-    figgs = findall(0,'Type','figure');   % includes hidden handles
-    for f = figgs.'
-        if ~contains(f.Name,'Scatter3')
-            close(f);
-        end
-    end
-    clear figgs f
-    
-    Ichanged=unique([Ichanged_manual Ichanged_auto]);
-    data.date_adjusted(Ichanged)=datetime('now');
-    data.reviewer(Ichanged)=reviewer_initials;
-
-    %%%Change type and iscall features
-    ud.features.type=data.features.type;
-    data.features.iscall=double(data.features.type>0);
-    ud.features.iscall=data.features.iscall;
-
-    figure(myfig);
-    set(myfig,'UserData',ud);
-
-    %  if strcmpi(ud.selectedFeatureField,'iscall')
-    %     Igood=find(ud.features.iscall>0);
-    %     ud.Igood=Igood;
-    %     data.Igood=Igood;
-    %     set(myfig,'UserData',ud);
-
-    %%%Update the internal 'Igood' variable stored in UserData.
-
-    fhandle=myfig.UserData.edtFeature1.Callback;
-    fhandle(myfig.UserData.edtFeature1);
-
-    
-    % else
-    %    set(myfig,'UserData',ud);
-    % end
-    %  warning off
-    %   set(ud.h,'XData',ud.Xt(ud.Igood,1),'YData',ud.Xt(ud.Igood,2),'ZData',ud.Xt(ud.Igood,3),'CData',double(ud.CData(ud.Igood)));
-    % % set(ud.h,'CData',double(ud.CData(ud.Igood)));
-    % warning on
-
-
-    %set(myfig,'UserData',ud);
-    notready=input('Enter 1 to make another selection:');
-
+Ichanged_manual=[];
+if display_manual& ~isempty(temp_Imanual)
+    [data.features.type, Ichanged_manual]=make_tile_spectrograms("Manual",temp_fnames(temp_Imanual), ...
+        data.features.type,Icluster(temp_Imanual),dataset_chc,images_dir,gsi_dir,display_NTV);
 end
+
+Ichanged_auto=[];
+if display_auto & ~isempty(temp_Iauto)
+    [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
+        data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,gsi_dir,display_NTV);
+end
+% close(2:length(get(0).Children))
+
+figgs = findall(0,'Type','figure');   % includes hidden handles
+for f = figgs.'
+    if ~contains(f.Name,'Scatter3')
+        close(f);
+    end
+end
+clear figgs f
+
+Ichanged=unique([Ichanged_manual Ichanged_auto]);
+data.date_adjusted(Ichanged)=datetime('now');
+data.reviewer(Ichanged)=reviewer_initials;
+
+%%%Change type and iscall features
+ud.features.type=data.features.type;
+data.features.iscall=double(data.features.type>0);
+ud.features.iscall=data.features.iscall;
+
+figure(myfig);
+set(myfig,'UserData',ud);
+
+%  if strcmpi(ud.selectedFeatureField,'iscall')
+%     Igood=find(ud.features.iscall>0);
+%     ud.Igood=Igood;
+%     data.Igood=Igood;
+%     set(myfig,'UserData',ud);
+
+%%%Update the internal 'Igood' variable stored in UserData.
+
+fhandle=myfig.UserData.edtFeature1.Callback;
+fhandle(myfig.UserData.edtFeature1);
+
+

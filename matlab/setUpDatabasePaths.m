@@ -18,6 +18,9 @@ success=false;
  elseif strcmpi(deblank(user_name),'oboulais')
      review_initials='OB';
  end
+
+
+
 switch hostname(1:end-1)
 
     case 'ishmael.ucsd.edu'
@@ -26,11 +29,25 @@ switch hostname(1:end-1)
             fprintf('Using direct drive on AaronThode''s ishmael account\n')
             gitpath = '/Users/thode/Desktop/ThodeLab';
             latent_space_dir = '/Users/oboulais/Public/Bowhead_DL_Project/';
+
+            %%%Check if GSI data available
+            gsi_dir='~/mnt/jonah3/Shared/Data';
+            if ~exist(gsi_dir,'dir')==7
+                disp('No GSI directory found, cannot link DASARs or play sounds');
+            end
+
             success=true;
         end
     otherwise
         fprintf('Using Aaron''s local laptop\n')
         gitpath = '/Users/thode/Desktop/ThodeLab';
+
+        %%%Check if GSI data available
+        gsi_dir='/Volumes/Shared/Data/';
+
+        if ~exist(gsi_dir,'dir')==7
+            disp('No GSI directory found, cannot link DASARs or play sounds');
+        end
 
         %%%Check if external drive.  If exists use it.
         if exist('/Volumes/Thode_AI_Working_Disk/','dir')==7

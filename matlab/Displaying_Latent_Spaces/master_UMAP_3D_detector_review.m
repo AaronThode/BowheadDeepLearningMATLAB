@@ -192,7 +192,7 @@ for Idir=1:length(dir_names)
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
     %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
-    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
+    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,data.date_adjusted,[78 90],zlimm_want); colormap jet
 
     %myfig=gcf;
 
@@ -209,14 +209,29 @@ for Idir=1:length(dir_names)
     %     GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
     % end
 
-    display_sample= input('Switch to transform view, rotate and press 1 when ready...');
-    if isempty(display_sample)
+
+   % list = {'Select and edit subsamples','Do nearest-neighbor analysis','Quit'};
+    %[indx,tf] = listdlg('ListString',list, ...
+    %    'PromptString','Adjust view(rotation,features, filtering) and then select option:', ...
+    %    'SelectionMode','single','InitialValue',1);
+
+   
+    operation_chc= input('Adjust view(rotation,features, filtering) and then type ''1'' to review, ''2'' for nearest neighbor analysis...   ');
+    if isempty(operation_chc)
         continue
     end
 
-    select_and_display_samples_from_UMAP_display;
+    if ~exist('display_sample','var')
+        operation_chc=true;
+    end
 
-    %clear data
-    
+    notready=true;
+    while operation_chc & notready
+        select_and_display_samples_from_UMAP_display;
+
+        notready=input('Enter 1 to select more points .....  ');
+
+    end
+
     cd(mydir)
 end

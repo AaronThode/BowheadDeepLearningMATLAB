@@ -1,6 +1,6 @@
 
 %function plot_manual_detection_allDASARs(manual_logs.manual_data{Isite,Iyear}.ind,time_zone_offset,head_info,Ibest)
-function plot_manual_detection_allDASARs(fname,ind,time_zone_offset,head_info,Ibest)
+function plot_manual_detection_allDASARs(fname,GSI_file_dir,ind,time_zone_offset,head_info,Ibest)
 
 file_len_sec=5; %length of final file clip (includes noise estimate)
 spectrogram_len_sec=3; %length of final spectrogram clip. (data used for noise removed)
@@ -16,12 +16,12 @@ param.spec.debug_plot=false;
 
 
 spectrogram_window_length=file_len_sec; %sec
-[~,hostname]=system('hostname');
-if contains(hostname,'ishmael')
-    GSI_file_dir='~/mnt/jonah3/Shared/Data';
-else
-    GSI_file_dir='/Volumes/Shared/Data/';
-end
+% [~,hostname]=system('hostname');
+% if contains(hostname,'ishmael')
+%     GSI_file_dir='~/mnt/jonah3/Shared/Data';
+% else
+%     GSI_file_dir='/Volumes/Shared/Data/';
+% end
 
 
 Isite=(fname(2));

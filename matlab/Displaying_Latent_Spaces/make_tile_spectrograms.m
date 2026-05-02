@@ -1,4 +1,4 @@
-function [type,Ichanged]=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,plot_NTV)
+function [type,Ichanged]=make_tile_spectrograms(FigureName,fnames,type,Iindex,dataset_chc,images_dir,GSI_file_dir,plot_NTV)
 
 Ichanged=[];
 imgdata_min_freq=25; %Minimum frequency
@@ -233,15 +233,16 @@ end %JJ
 %%%%General input box window for call review...
 prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2', ...
     'New type [11 is unknown call type, 12 is uncertain if call:', ...
+    'Enter an index to play sound...', ...
     'Enter an index to review linked DASARs..'};
 dlgtitle = 'Input';
-fieldsize = [1 45; 1 45; 1 30];
+fieldsize = [1 45; 1 45; 1 30; 1 30];
 if strcmpi(FigureName,'manual')
-    Ndefault=min([30 Nsamples]);
+  %  Ndefault=min([30 Nsamples]);
     Ndefault=Nsamples;
-    definput = {sprintf('1:%i',Ndefault),'0','-1'};  %Turning whale call into non-whale call
+    definput = {sprintf('1:%i',Ndefault),'0','-1','-1'};  %Turning whale call into non-whale call
 else
-    definput = {'0','11','-1'};  %Switching automated detection to unknown call
+    definput = {'0','11','-1','-1'};  %Switching automated detection to unknown call
 
 end
 opts_view_other_window.WindowStyle='normal';
@@ -255,57 +256,33 @@ end
 
 
 %%%%%Review manual DASARs near a detection if desired
-JJ=str2double(call_review{3});
-while JJ>0  %If user has selected something
+Ilink=str2double(call_review{4});
 
-    %%%Option to plot spectrograms of all linked manual detections
-    Isite=str2num(fnames{JJ}(2));
-    Iyear=str2num(fnames{JJ}(3:4))-7;
-    plot_manual_detection_allDASARs(fnames{JJ},manual_logs.manual_data{Isite,Iyear}.ind,time_zone_offset,head_info,Ibest_this_DASAR(JJ));
-
-    if strcmp(dataset_chc,'manual')
-        imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)}));
-    else
-        try
-            if strcmp(fnames{(JJ)}(end-4),'0')
-                load_name=sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)});
-                imgdata=load(load_name);
-            else
-                load_name=sprintf('%s%s%s',images_dir{2},filesep,fnames{(JJ)});
-                imgdata=load(load_name);
-            end
-        catch
-            fprintf('%s not in directory...\n',load_name);
-            continue
-        end
-    end
-
-    imgdata.features.fpeak=imgdata_min_freq+imgdata.features.fpeak;
-    subplot(4,2,8)
-    FF=imgdata.dF*(0:size(imgdata.SNR_gram,1));
-    TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
-    imagesc(TT,FF,double(imgdata.SNR_gram)/5);colorbar;axis xy;title(fnames{JJ})
-    hold on;plot(0.1,imgdata.features.fpeak-imgdata_min_freq,'o','color','w');
-    
-    %dummy=input('Rearrange windows and then hit return');
-    %%%Plot manual detections closest to this detection across all DASARS....
-    prompt1 = {'Enter a positive integer to review linked DASARs..'};
-    dlgtitle1 = 'More linked DASARs?';
-    fieldsize1 = [1 45];
-    definput1 = {'-1'};
-    %dummy=input('Rearrange windows and then hit return');
-    plot_linked_calls = inputdlg(prompt1,dlgtitle1,fieldsize1,definput1,opts_view_other_window);
-    JJ=str2double(plot_linked_calls{1});
-    close
-
+while Ilink>0  %If user has selected something
+    Ilink=sub_plot_manual_detection_allDASARs(Ilink);
 end %while JJ>0
 
+%%%Play a sound if available 
+Isound=str2double(call_review{3});
+
+while Isound>0  %If user has selected something
+    play_sound(fnames{Isound});
+
+    Iwant=[];
+    while isempty(Iwant)
+        call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+        Iwant=str2num(call_review{1});
+        if isempty(Iwant),disp('Bad input! Redo');end
+    end
+    Isound=str2double(call_review{3});
+
+end
 
 %%%%Reassign labels if desired
 drawnow
 
 while Iwant(1)>0
-     %Iwant=Iwant(1):Iwant(2);
+    %Iwant=Iwant(1):Iwant(2);
     new_type=str2double(call_review{2});
 
     %%%Debug comment....
@@ -316,16 +293,12 @@ while Iwant(1)>0
     if Iwant(1)>0
         type(Iindex(Iwant))=new_type;
         try
-        Ichanged=unique([Ichanged; Iindex(Iwant)]);
+            Ichanged=unique([Ichanged; Iindex(Iwant)]);
         catch
             keyboard
         end
 
     end
-
-    %dummy=input('Rearrange windows and then hit return');
-    %call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
-    %Iwant=str2num(call_review{1});
 
     Iwant=[];
     while isempty(Iwant)
@@ -334,5 +307,91 @@ while Iwant(1)>0
         if isempty(Iwant),disp('Bad input! Redo');end
     end
 
-    
+end
+
+
+%%%Helper functions
+
+
+    function play_sound(fname)
+        file_len_sec=5; %length of final file clip (includes noise estimate)
+
+        Isite1=(fname(2));
+        Iyear1=(fname(3:4));
+        Iletter1=(fname(5));
+
+        file_want=fname(1:22);
+        file_want(17:end)='0';
+        file_want=[file_want '.gsi'];
+
+        tabs_call1=datetime(fname(8:22));  %%%The filename is the time of the midpoint of the detection.
+        %ctime_start=posixtime(tabs_call1)-file_len_sec/2;
+        ctime_start=posixtime(tabs_call1);
+        
+        % [~,hostname]=system('hostname');
+        % if contains(hostname,'ishmael')
+        %     GSI_file_dir='~/mnt/jonah3/Shared/Data';
+        % else
+        %     GSI_file_dir='/Volumes/Shared/Data/';
+        % end
+
+         dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
+        GSI_file_dir,Iyear1,Isite1,Iyear1, ...
+        Isite1,Iyear1,Iletter1);
+
+
+         x=readgsi([dir_want filesep file_want],ctime_start,file_len_sec,'native');
+         y=quick_filter(x(1,:),1000,20,475);
+         y=y-mean(y);
+         is_played=1;
+         while is_played==1
+             soundsc(y,1000)
+            is_played=input('Type 1 to repeat.... ');
+            
+        end
+
+    end
+
+    function Ilink=sub_plot_manual_detection_allDASARs(JJ)
+        %%%Option to plot spectrograms of all linked manual detections
+        Isite=str2num(fnames{JJ}(2));
+        Iyear=str2num(fnames{JJ}(3:4))-7;
+        plot_manual_detection_allDASARs(fnames{JJ},GSI_file_dir,manual_logs.manual_data{Isite,Iyear}.ind,time_zone_offset,head_info,Ibest_this_DASAR(JJ));
+
+        if strcmp(dataset_chc,'manual')
+            imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)}));
+        else
+            try
+                if strcmp(fnames{(JJ)}(end-4),'0')
+                    load_name=sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)});
+                    imgdata=load(load_name);
+                else
+                    load_name=sprintf('%s%s%s',images_dir{2},filesep,fnames{(JJ)});
+                    imgdata=load(load_name);
+                end
+            catch
+                fprintf('%s not in directory...\n',load_name);
+                return
+            end
+        end
+
+        imgdata.features.fpeak=imgdata_min_freq+imgdata.features.fpeak;
+        subplot(4,2,8)
+        FF=imgdata.dF*(0:size(imgdata.SNR_gram,1));
+        TT=imgdata.dT*(0:size(imgdata.SNR_gram,2));
+        imagesc(TT,FF,double(imgdata.SNR_gram)/5);colorbar;axis xy;title(fnames{JJ})
+        hold on;plot(0.1,imgdata.features.fpeak-imgdata_min_freq,'o','color','w');
+
+        %dummy=input('Rearrange windows and then hit return');
+        %%%Plot manual detections closest to this detection across all DASARS....
+        prompt1 = {'Enter a positive integer to review linked DASARs..'};
+        dlgtitle1 = 'More linked DASARs?';
+        fieldsize1 = [1 45];
+        definput1 = {'-1'};
+        %dummy=input('Rearrange windows and then hit return');
+        plot_linked_calls = inputdlg(prompt1,dlgtitle1,fieldsize1,definput1,opts_view_other_window);
+        Ilink=str2double(plot_linked_calls{1});
+        close
+    end
+
 end

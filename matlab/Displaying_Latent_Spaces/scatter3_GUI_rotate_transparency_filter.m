@@ -1,7 +1,7 @@
 
 
 
-function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,zlimm_want)
+function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,date_adjusted,default_view,zlimm_want)
 % Scatter3 with independent X,Y,Z sliders + edit boxes for axis limits
 % and edit boxes for Azimuth and Elevation
 % Alpha (transparency) slider + edit
@@ -30,6 +30,12 @@ ax = axes('Parent',fig,'Position',[0.05 0.15 0.75 0.8]);
 h = scatter3(ax,X0(Igood,1),X0(Igood,2),X0(Igood,3),sizze,type,"o","filled");
 h.MarkerEdgeAlpha=alpha_value;
 h.MarkerFaceAlpha=alpha_value;
+% %I would like
+%to change shape of points that have changed their type, but this would
+%require a separate scatterplot.  Consider using a unique color...
+
+%Iadjusted=find(date_adjusted-min(date_adjusted)>hours(24)); 
+
 xlabel('x');ylabel('y');zlabel('z');
 axis(ax,'equal')
 colorbar('location','south')
