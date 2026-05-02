@@ -246,7 +246,12 @@ else
 end
 opts_view_other_window.WindowStyle='normal';
 
-call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+Iwant=[];
+while isempty(Iwant)
+    call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+    Iwant=str2num(call_review{1});
+    if isempty(Iwant),disp('Bad input! Redo');end
+end
 
 
 %%%%%Review manual DASARs near a detection if desired
@@ -298,7 +303,6 @@ end %while JJ>0
 
 %%%%Reassign labels if desired
 drawnow
-Iwant=str2num(call_review{1});
 
 while Iwant(1)>0
      %Iwant=Iwant(1):Iwant(2);
@@ -320,7 +324,15 @@ while Iwant(1)>0
     end
 
     %dummy=input('Rearrange windows and then hit return');
-    call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
-    Iwant=str2num(call_review{1});
+    %call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+    %Iwant=str2num(call_review{1});
+
+    Iwant=[];
+    while isempty(Iwant)
+        call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+        Iwant=str2num(call_review{1});
+        if isempty(Iwant),disp('Bad input! Redo');end
+    end
+
     
 end

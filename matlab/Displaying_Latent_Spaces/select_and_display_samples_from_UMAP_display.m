@@ -7,13 +7,19 @@ end
 notready=true;
 while display_sample & notready
 
-    drawnow
+    
     figure(myfig);
     ud=myfig.UserData;
-    Xt=ud.Xt;
+    Xt=ud.Xt;  %%Figure might have been rotated after selection, so need to update...
     Igood=ud.Igood;  %%%Points visible on screen (survived filtering)
+
+    %%%Check that length of Igood matches points on screen
+    if (length(Igood)~=length(ud.h.CData)) | (length(Igood) ~= length(ud.h.XData))
+        keyboard
+    end
+
     tmp=ginput(2);
-    tmp(:,3)=str2num(gcf().UserData.edtZ.String)';
+    tmp(:,3)=str2num(ud.edtZ.String)';
     Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
         &Xt(Igood,2)>min(tmp(:,2)) &Xt(Igood,2)<max(tmp(:,2)) ...
         &Xt(Igood,3)>min(tmp(:,3)) &Xt(Igood,3)<max(tmp(:,3)));
@@ -32,7 +38,7 @@ while display_sample & notready
         length(Icluster),N_manual,N_unmarked);
 
     %Display manual examples
-    hh=gcf().UserData.ax;
+    hh=ud.ax;
     hh.Title.String=sprintf('%i Samples in range, %i manual, %i auto', ...
         length(Icluster),N_manual,N_unmarked);
     hh.Title.FontWeight="bold";
@@ -52,47 +58,50 @@ while display_sample & notready
         [data.features.type, Ichanged_auto]=make_tile_spectrograms("Auto",temp_fnames(temp_Iauto), ...
             data.features.type,Icluster(temp_Iauto),dataset_chc,images_dir,display_NTV);
     end
-    close(2:length(get(0).Children))
+   % close(2:length(get(0).Children))
 
     figgs = findall(0,'Type','figure');   % includes hidden handles
     for f = figgs.'
-        if f.Number ~= 1
-            close(f)
+        if ~contains(f.Name,'Scatter3')
+            close(f);
         end
     end
-
+    clear figgs f
+    
     Ichanged=unique([Ichanged_manual Ichanged_auto]);
     data.date_adjusted(Ichanged)=datetime('now');
     data.reviewer(Ichanged)=reviewer_initials;
-    %%%Change UMAP color scheme...
+
+    %%%Change type and iscall features
     ud.features.type=data.features.type;
     data.features.iscall=double(data.features.type>0);
     ud.features.iscall=data.features.iscall;
 
-    figure(1);
-    % hhh=gcf();
-    % hhh.UserData.features.type=data.features.type;
-    % hhh.UserData.features.iscall=double(ud.features.iscall);
+    figure(myfig);
+    set(myfig,'UserData',ud);
 
+    %  if strcmpi(ud.selectedFeatureField,'iscall')
+    %     Igood=find(ud.features.iscall>0);
+    %     ud.Igood=Igood;
+    %     data.Igood=Igood;
+    %     set(myfig,'UserData',ud);
 
-    if strcmpi(ud.selectedFeatureField,'iscall')
-        Igood=find(ud.features.iscall>0);
-        ud.Igood=Igood;
-        data.Igood=Igood;
-        set(myfig,'UserData',ud);
+    %%%Update the internal 'Igood' variable stored in UserData.
 
-        fhandle=myfig.UserData.edtFeature1.Callback;
-        fhandle(myfig.UserData.edtFeature1);
-    else
-        set(myfig,'UserData',ud);
-    end
+    fhandle=myfig.UserData.edtFeature1.Callback;
+    fhandle(myfig.UserData.edtFeature1);
+
+    
+    % else
+    %    set(myfig,'UserData',ud);
+    % end
     %  warning off
     %   set(ud.h,'XData',ud.Xt(ud.Igood,1),'YData',ud.Xt(ud.Igood,2),'ZData',ud.Xt(ud.Igood,3),'CData',double(ud.CData(ud.Igood)));
     % % set(ud.h,'CData',double(ud.CData(ud.Igood)));
     % warning on
 
 
-    set(myfig,'UserData',ud);
+    %set(myfig,'UserData',ud);
     notready=input('Enter 1 to make another selection:');
 
 end

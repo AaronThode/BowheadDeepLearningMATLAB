@@ -114,7 +114,8 @@ edtFeature2 = uicontrol(fig,'Style','edit','Position',[x0+300 y-20 80 22],...
 
 
 % Checkbox: transform or change view
-chk = uicontrol(fig,'Style','checkbox','Position',[x0 20 320 20],'String','Rotate coordinates (transform points)','Value',1,'Callback',@onControl);
+chk = uicontrol(fig,'Style','checkbox','Position',[x0 20 320 20],'String', ...
+    'Rotate coordinates (transform points)','Value',1,'Callback',@onControl);
 
 % Store handles/data
 % store handles
@@ -130,7 +131,7 @@ ud.edtFeature1 = edtFeature1;
 ud.edtFeature2 = edtFeature2;
 
 ud.X0 = X0; ud.h = h; ud.ax = ax;
-ud.Igood=Igood;
+ud.Igood=Igood;  %%%Points that meet the filter criteria...
 ud.sldX = sldX; ud.sldY = sldY; ud.sldZ = sldZ;
 ud.edtX = edtX; ud.edtY = edtY; ud.edtZ = edtZ;
 ud.sldAz = sldAz; ud.sldEl = sldEl; ud.edtAz = edtAz; ud.edtEl = edtEl;
@@ -164,6 +165,24 @@ updateDisplay();
 
 % --- Callbacks -------------------------------------------------------
 
+function onFeatureSelect(src,~)
+        udtmp = fig.UserData;
+        idx = get(src,'Value');
+        items = get(src,'String');
+        sel = items{idx};
+        % store the selected field name for other callbacks to use
+        udtmp.selectedFeatureField = sel;
+        udtmp.CData=udtmp.features.(sel);
+        %udtmp.h.CData=double(udtmp.CData(udtmp.Igood));  %%Change color...
+        set(udtmp.h,'CData',double(udtmp.CData(udtmp.Igood)));  %Update color
+        minval=min(udtmp.h.CData);
+        maxval=max(udtmp.h.CData);
+        clim(udtmp.ax,[minval maxval]);
+        
+        fig.UserData = udtmp;
+        
+end
+
 % Callback shared by both feature edit boxes
     function onFilterFeatureEdit(src,~)
         udtmp = fig.UserData;
@@ -183,12 +202,19 @@ updateDisplay();
         warning off
         doTransform = get(udtmp.chk,'Value');
         if doTransform
-            set(udtmp.h,'XData',udtmp.Xt(udtmp.Igood,1),'YData',udtmp.Xt(udtmp.Igood,2),'ZData',udtmp.Xt(udtmp.Igood,3));
+            set(udtmp.h,'XData',udtmp.Xt(udtmp.Igood,1),'YData',...
+                udtmp.Xt(udtmp.Igood,2),'ZData',udtmp.Xt(udtmp.Igood,3), ...
+                'CData',double(udtmp.CData(udtmp.Igood)));
         else
-            set(udtmp.h,'XData',udtmp.X0(udtmp.Igood,1),'YData',udtmp.X0(udtmp.Igood,2),'ZData',udtmp.X0(udtmp.Igood,3));
+            set(udtmp.h,'XData',udtmp.X0(udtmp.Igood,1),'YData',udtmp.X0(udtmp.Igood,2), ...
+                'ZData',udtmp.X0(udtmp.Igood,3), ...
+                'CData',double(udtmp.CData(udtmp.Igood)));
         end
-        udtmp.h.CData=double(udtmp.CData(udtmp.Igood));
-        
+        minval=min(udtmp.h.CData);maxval=max(udtmp.h.CData);
+        if minval==maxval
+            maxval=maxval+0.1;
+        end
+        clim(udtmp.ax,[minval maxval]);
         udtmp.ddFilter_text.String=sprintf('Filter Feature %i samples',length(udtmp.Igood));
         warning on
         fig.UserData = udtmp;
@@ -214,18 +240,7 @@ updateDisplay();
         onFilterFeatureEdit(udtmp.edtFeature1);
     end
 
-    function onFeatureSelect(src,~)
-        udtmp = fig.UserData;
-        idx = get(src,'Value');
-        items = get(src,'String');
-        sel = items{idx};
-        % store the selected field name for other callbacks to use
-        udtmp.selectedFeatureField = sel;
-        udtmp.CData=udtmp.features.(sel);
-        udtmp.h.CData=double(udtmp.CData(udtmp.Igood));  %%Change color...
-        fig.UserData = udtmp;
-        
-    end
+    
 
     function onAlphaControl(src,~)
         % slider changed -> update edit and scatter alpha
@@ -354,7 +369,7 @@ updateDisplay();
             set(ud.h,'XData',ud.X0(ud.Igood,1),'YData',ud.X0(ud.Igood,2),'ZData',ud.X0(ud.Igood,3));
             view(ud.ax,[az el]);
         end
-        drawnow
+        %drawnow
     end
 
     function updateDisplay()
