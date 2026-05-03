@@ -237,52 +237,59 @@ for Idir=1:length(dir_names)
                 disp('Computing nearest neighbor....')
                 ud=myfig.UserData;
                 Igood=ud.Igood;
-                Neighbors=40;
+                Neighbors=20;
                 Idx=knnsearch(data.latent_embeddings(Igood,:), ...
-                    data.latent_embeddings(Igood,:),'K',Neighbors,'IncludeTies',true,'Distance','euclidean'); 
-                
-                score=zeros(length(Igood),1);
-                for I=1:length(Idx)
-                    iscall=data.features.iscall(Igood(Idx{I}));
-                    score(I)=sum(iscall)/Neighbors;
+                    data.latent_embeddings(Igood,:),'K',Neighbors,'IncludeTies',true,'Distance','euclidean');
+
+
+
+                threshold=unique([ 0 0:1/Neighbors:1 1]);
+                strrr='kr';
+                for I=1:2  %1 is original manual labels, 2 is latest relabel
+                    switch I
+                        case 1
+                            iscall=data.features.type_org>0 & data.features.type_org<12;
+                        case 2
+                            iscall=data.features.type>0 & data.features.type<12;
+                    end
+
+                    score=zeros(length(Igood),1);
+                    for Iscore=1:length(Idx)
+                        clusster=iscall(Igood(Idx{Iscore}));
+                        score(Iscore)=sum(clusster)/Neighbors;
+                    end
+                    Icall=iscall(Igood)>0;
+                    Ino_call=(iscall(Igood)==0);
+
+                    total_positives_in_dataset=sum(Icall);
+
+                    recall=zeros(1,length(threshold));precision=recall;
+                    for Ithresh=1:length(threshold)
+                        detected_positives=sum(score(Icall)>=threshold(Ithresh));
+                        false_positives=sum(score(Ino_call)>=threshold(Ithresh));
+                        recall(Ithresh)=detected_positives./total_positives_in_dataset;
+                        precision(Ithresh)=detected_positives./(detected_positives+false_positives);
+
+                    end
+
+                    figure(100);
+                    subplot(1,2,1);hold on
+                    plot(recall,precision,[strrr(I) '-o']);grid on;
+                    xlabel('Recall');ylabel('Precision');
+                    xlim([0 1]);ylim([0 1]);
+                    subplot(1,2,2);hold on
+                    plot(1-recall,1-precision,[strrr(I) '-o']);grid on;
+                    xlabel('Miss fraction');ylabel('False discovery rate (Fraction of calls that are not calls)');
+                    xlim([0 1]);ylim([0 1]);
                 end
+                legend('original','edited');
+                title(sprintf('Dataset length: %i samples',length(Igood)))
+                keyboard
 
-                Iman=find(data.features.iscall(Igood)>0);
-                Iauto=find(data.features.iscall(Igood)==0);
-
-                score_bin=0:(1/Neighbors):1;
-                score_mid=0.5*(score_bin(2:end)+score_bin(1:(end-1)));
-                [NN_man]=histcounts(score(Iman),score_bin,'Normalization','probability');
-                [NN_auto]=histcounts(score(Iauto),score_bin,'Normalization','probability');
-                
-                
-                figure(101)
-                subplot(2,2,1)
-                histogram(score(Iman),score_bin,'Normalization','probability');
-                xlabel(' fraction of neighbors with correct label')
-                %ylabel('Fraction of true call samples')
-                title('Auto detections associated with calls');
-                grid on
-                subplot(2,2,2)
-                histogram(score(Iauto),score_bin,'Normalization','probability');
-                xlabel(' fraction of neighbors with correct label')
-                title('Automated detections not associated with calls');
-                %ylabel('Fraction of non-call samples')
-                grid on
-
-                subplot(2,1,2)
-                miss_fraction=cumsum(NN_man);
-
-                false_fraction=1-cumsum(NN_auto);
-
-                plot(false_fraction,1-miss_fraction);grid on
-                xlabel('False-positive fraction');ylabel('Probability of detection')
-                axis equal
-                pause;
 
             case 'save'
-                  disp('Saving...')
-                  save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+                disp('Saving...')
+                save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
             case 'quit'
                 notready=false;
 
