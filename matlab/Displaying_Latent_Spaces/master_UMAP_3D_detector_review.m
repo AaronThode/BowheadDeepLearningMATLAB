@@ -162,8 +162,15 @@ for Idir=1:length(dir_names)
         end %%II
         data.features.type_org=data.features.type;
         data.date_adjusted=repmat(datetime('now'),length(data.features.type),1);
+        data.features.score=zeros(size(data.features.type));  %Score is a feature!
         data.reviewer=repmat("XX",length(data.features.type),1);
 
+        data.features=orderfields(data.features);
+
+        %%%Put iscall last so it is default color label in plot...
+        fieldname=fieldnames(data.features);
+        J_iscall=find(contains(fieldname,'iscall'));
+        data.features=orderfields(data.features,[1:(J_iscall-1) (J_iscall+1):length(fieldname) J_iscall]);
         save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
     end  %Advanced labels
 
@@ -253,10 +260,10 @@ for Idir=1:length(dir_names)
                             iscall=data.features.type>0 & data.features.type<12;
                     end
 
-                    score=zeros(length(Igood),1);
+                    score=zeros(length(iscall),1);
                     for Iscore=1:length(Idx)
                         clusster=iscall(Igood(Idx{Iscore}));
-                        score(Iscore)=sum(clusster)/Neighbors;
+                        score(Igood(Iscore))=sum(clusster)/Neighbors;
                     end
                     Icall=iscall(Igood)>0;
                     Ino_call=(iscall(Igood)==0);
@@ -283,8 +290,12 @@ for Idir=1:length(dir_names)
                     xlim([0 1]);ylim([0 1]);
                 end
                 legend('original','edited');
-                title(sprintf('Dataset length: %i samples',length(Igood)))
-                keyboard
+                title(sprintf('Dataset length: %i samples (%i calls, %i false)',length(Igood),sum(Icall),sum(Ino_call)))
+                
+                ud.features.score=score;
+                
+                set(myfig,'UserData',ud);
+
 
 
             case 'save'

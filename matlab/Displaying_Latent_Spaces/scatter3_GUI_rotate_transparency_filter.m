@@ -128,6 +128,7 @@ chk = uicontrol(fig,'Style','checkbox','Position',[x0 20 320 20],'String', ...
 ud = fig.UserData;
 ud.ddFeature = ddFeature;
 ud.selectedFeatureField = sel;
+ud.selectedFilterField = sel;
 
 ud.ddFilter = ddFilter;
 ud.ddFilter_text=ddFilter_text;
@@ -201,7 +202,7 @@ end
             udtmp.maxVal = str2double(val);
         end
 
-        sel=udtmp.selectedFeatureField;
+        sel=udtmp.selectedFilterField;
         udtmp.Igood=find(udtmp.features.(sel)>=udtmp.minVal & ...
             udtmp.features.(sel)<=udtmp.maxVal);
 
@@ -232,7 +233,7 @@ end
         items = get(src,'String');
         sel = items{idx};
         % store the selected field name for other callbacks to use
-        udtmp.selectedFeatureField = sel;
+        udtmp.selectedFilterField = sel;
         disp(sel)
 
         %%%Update edit boxes
