@@ -20,7 +20,7 @@ Icluster=Igood(Icluster);  %Index now relates fo full data set
 
 %%%Don''t count recent edits...
 N_all_subsamples=length(Icluster);
-Inot_recent=find((datetime("now")-data.date_adjusted(Icluster))>hours(hours_to_exclude_recent_edits));
+Inot_recent=find(data.date_adjusted(Icluster)<ignore_edits_more_recent_than);  %exclude editing previously edited
 
 Icluster=Icluster(Inot_recent);  %Index now relates fo full data set
 

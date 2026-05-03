@@ -237,7 +237,7 @@ prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2', ...
 dlgtitle = 'Input';
 fieldsize = [1 45; 1 45; 1 30; 1 30];
 if strcmpi(FigureName,'manual')
-  %  Ndefault=min([30 Nsamples]);
+    %  Ndefault=min([30 Nsamples]);
     Ndefault=Nsamples;
     definput = {sprintf('1:%i',Ndefault),'0','-1','-1'};  %Turning whale call into non-whale call
 else
@@ -246,67 +246,52 @@ else
 end
 opts_view_other_window.WindowStyle='normal';
 
-Iwant=[];
-while isempty(Iwant)
+Iwant(1)=-1;
+while Iwant(1)~=0
     call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
     Iwant=str2num(call_review{1});
-    if isempty(Iwant),disp('Bad input! Redo');end
-end
-
-
-%%%%%Review manual DASARs near a detection if desired
-Ilink=str2double(call_review{4});
-
-while Ilink>0  %If user has selected something
-    Ilink=sub_plot_manual_detection_allDASARs(Ilink);
-end %while JJ>0
-
-%%%Play a sound if available 
-Isound=str2double(call_review{3});
-
-while Isound>0  %If user has selected something
-    play_sound(fnames{Isound});
-
-    Iwant=[];
     while isempty(Iwant)
         call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
         Iwant=str2num(call_review{1});
         if isempty(Iwant),disp('Bad input! Redo');end
     end
+
+    %%%%%Review manual DASARs near a detection if desired
+    Ilink=str2double(call_review{4});
+    if Ilink>0  %If user has selected something
+        sub_plot_manual_detection_allDASARs(Ilink);
+        Iwant=-1;
+        continue
+    end %while JJ>0
+
+    %%%Play a sound if available
     Isound=str2double(call_review{3});
-
-end
-
-%%%%Reassign labels if desired
-drawnow
-
-while Iwant(1)>0
-    %Iwant=Iwant(1):Iwant(2);
-    new_type=str2double(call_review{2});
-
-    %%%Debug comment....
-    for K=1:length(Iwant)
-        fprintf('%s type %i changed to type %i...\n',fnames{Iwant(K)},type(Iindex(Iwant(K))),new_type);
+    if Isound>0  %If user has selected something
+        play_sound(fnames{Isound});
+        Iwant=-1;
+        continue
     end
 
+    %%%%Reassign labels if desired
+    drawnow
+
     if Iwant(1)>0
+        %Iwant=Iwant(1):Iwant(2);
+        new_type=str2double(call_review{2});
+
+        %%%Debug comment....
+        for K=1:length(Iwant)
+            fprintf('%s type %i changed to type %i...\n',fnames{Iwant(K)},type(Iindex(Iwant(K))),new_type);
+        end
         type(Iindex(Iwant))=new_type;
         try
-            Ichanged=unique([Ichanged; Iindex(Iwant)]);  
+            Ichanged=unique([Ichanged; Iindex(Iwant)]);
         catch
             keyboard
         end
 
-    end
-
-    Iwant=[];
-    while isempty(Iwant)
-        call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
-        Iwant=str2num(call_review{1});
-        if isempty(Iwant),disp('Bad input! Redo');end
-    end
-
-end
+    end %if Iwant
+end %while Iwant(1)~=0
 
 
 %%%Helper functions
@@ -326,7 +311,7 @@ end
         tabs_call1=datetime(fname(8:22));  %%%The filename is the time of the midpoint of the detection.
         %ctime_start=posixtime(tabs_call1)-file_len_sec/2;
         ctime_start=posixtime(tabs_call1);
-        
+
         % [~,hostname]=system('hostname');
         % if contains(hostname,'ishmael')
         %     GSI_file_dir='~/mnt/jonah3/Shared/Data';
@@ -334,24 +319,26 @@ end
         %     GSI_file_dir='/Volumes/Shared/Data/';
         % end
 
-         dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
-        GSI_file_dir,Iyear1,Isite1,Iyear1, ...
-        Isite1,Iyear1,Iletter1);
+        dir_want=sprintf('%s/Shell20%s_GSI_Data/S%s%sgsif/S%s%s%s0', ...
+            GSI_file_dir,Iyear1,Isite1,Iyear1, ...
+            Isite1,Iyear1,Iletter1);
 
 
-         x=readgsi([dir_want filesep file_want],ctime_start,file_len_sec,'native');
-         y=quick_filter(x(1,:),1000,20,475);
-         y=y-mean(y);
-         is_played=1;
-         while is_played==1
-             soundsc(y,1000)
-            is_played=input('Type 1 to repeat.... ');
-            
+        x=readgsi([dir_want filesep file_want],ctime_start,file_len_sec,'native');
+        y=quick_filter(x(1,:),1000,20,475);
+        y=y-mean(y);
+        is_played=1;
+        while is_played==1
+            soundsc(y,1000);
+            msg = "Repeat Sound?";
+            opts = ["Yes","No"];
+            is_played = menu(msg,opts);
+
         end
 
     end
 
-    function Ilink=sub_plot_manual_detection_allDASARs(JJ)
+    function sub_plot_manual_detection_allDASARs(JJ)
         %%%Option to plot spectrograms of all linked manual detections
         Isite=str2num(fnames{JJ}(2));
         Iyear=str2num(fnames{JJ}(3:4))-7;
@@ -383,14 +370,14 @@ end
 
         %dummy=input('Rearrange windows and then hit return');
         %%%Plot manual detections closest to this detection across all DASARS....
-        prompt1 = {'Enter a positive integer to review linked DASARs..'};
-        dlgtitle1 = 'More linked DASARs?';
-        fieldsize1 = [1 45];
-        definput1 = {'-1'};
-        %dummy=input('Rearrange windows and then hit return');
-        plot_linked_calls = inputdlg(prompt1,dlgtitle1,fieldsize1,definput1,opts_view_other_window);
-        Ilink=str2double(plot_linked_calls{1});
-        close
+        % prompt1 = {'Enter a positive integer to review additional linked DASARs..'};
+        % dlgtitle1 = 'More linked DASARs?';
+        % fieldsize1 = [1 45];
+        % definput1 = {'-1'};
+        % %dummy=input('Rearrange windows and then hit return');
+        % plot_linked_calls = inputdlg(prompt1,dlgtitle1,fieldsize1,definput1,opts_view_other_window);
+        % Ilink=str2double(plot_linked_calls{1});
+        % close
     end
 
 end

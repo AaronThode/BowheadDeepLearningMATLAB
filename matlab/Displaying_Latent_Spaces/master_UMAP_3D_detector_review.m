@@ -27,8 +27,9 @@ dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
 
-hours_to_exclude_recent_edits=24;  %exclude editing previously edited
-                    %   samples if they were made less than XX hours agao
+ignore_edits_more_recent_than=datetime(2026,5,1,21,0,0);  %exclude editing previously edited
+%   samples if they were made more recently than this
+%   time
 display_manual=false;  %If true, plot spectrogram images of known manual calls
 display_auto=true;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
@@ -51,7 +52,7 @@ switch dataset_chc
             [Database_dir 'LD16/Autoencoder_v14_100E_16LD_32C_Manual_100K_Date20260122-190056.dir']};
 
         images_dir{1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
-       
+
     case 'auto'
         %Original result, with samples not centered in time...
         %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
@@ -114,7 +115,7 @@ for Idir=1:length(dir_names)
     %           reviewers.
     %       data.feature.type     are the labels after review (cleaned data set)
     %           Always has full classification labels.
-     %       gcf().UserData.CData:  subset of samples being plotted.
+    %       gcf().UserData.CData:  subset of samples being plotted.
     %   Related structures:
     %       data.date_adjusted:   datetime of when data.feature.type was
     %                           altered
@@ -167,7 +168,7 @@ for Idir=1:length(dir_names)
     end  %Advanced labels
 
     data.features.iscall=(data.features.type>0);
-    
+
 
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
@@ -212,28 +213,80 @@ for Idir=1:length(dir_names)
     % end
 
 
-   % list = {'Select and edit subsamples','Do nearest-neighbor analysis','Quit'};
+    % list = {'Select and edit subsamples','Do nearest-neighbor analysis','Quit'};
     %[indx,tf] = listdlg('ListString',list, ...
     %    'PromptString','Adjust view(rotation,features, filtering) and then select option:', ...
     %    'SelectionMode','single','InitialValue',1);
 
-   
-    operation_chc= input('Adjust view(rotation,features, filtering) and then type ''1'' to review, ''2'' for nearest neighbor analysis...   ');
-    if isempty(operation_chc)
-        continue
-    end
 
-    if ~exist('display_sample','var')
-        operation_chc=true;
-    end
+    group = "Updates";
+    pref = "Conversion";
+    tit = "Choose Operation";
+    quest = "After adjusting figure, choose an option:";
+    pbtns = ["Edit","Nearest Neighbor Compute","Save","Quit"];
 
     notready=true;
-    while operation_chc & notready
-        select_and_display_samples_from_UMAP_display;
+    while notready
+        [operation_chc,tf] = uigetpref(group,pref,tit,quest,pbtns);
+        switch operation_chc
+            case 'edit'
+                disp('Editing...')
+                select_and_display_samples_from_UMAP_display;
 
-        notready=input('Enter 1 to select more points .....  ');
+            case 'nearest neighbor compute'
+                disp('Computing nearest neighbor....')
+                ud=myfig.UserData;
+                Igood=ud.Igood;
+                Neighbors=40;
+                Idx=knnsearch(data.latent_embeddings(Igood,:), ...
+                    data.latent_embeddings(Igood,:),'K',Neighbors,'IncludeTies',true,'Distance','euclidean'); 
+                
+                score=zeros(length(Igood),1);
+                for I=1:length(Idx)
+                    iscall=data.features.iscall(Igood(Idx{I}));
+                    score(I)=sum(iscall)/Neighbors;
+                end
 
+                Iman=find(data.features.iscall(Igood)>0);
+                Iauto=find(data.features.iscall(Igood)==0);
+
+                score_bin=0:(1/Neighbors):1;
+                score_mid=0.5*(score_bin(2:end)+score_bin(1:(end-1)));
+                [NN_man]=histcounts(score(Iman),score_bin,'Normalization','probability');
+                [NN_auto]=histcounts(score(Iauto),score_bin,'Normalization','probability');
+                
+                
+                figure(101)
+                subplot(2,2,1)
+                histogram(score(Iman),score_bin,'Normalization','probability');
+                xlabel(' fraction of neighbors with correct label')
+                %ylabel('Fraction of true call samples')
+                title('Auto detections associated with calls');
+                grid on
+                subplot(2,2,2)
+                histogram(score(Iauto),score_bin,'Normalization','probability');
+                xlabel(' fraction of neighbors with correct label')
+                title('Automated detections not associated with calls');
+                %ylabel('Fraction of non-call samples')
+                grid on
+
+                subplot(2,1,2)
+                miss_fraction=cumsum(NN_man);
+
+                false_fraction=1-cumsum(NN_auto);
+
+                plot(false_fraction,1-miss_fraction);grid on
+                xlabel('False-positive fraction');ylabel('Probability of detection')
+                axis equal
+                pause;
+
+            case 'save'
+                  disp('Saving...')
+                  save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+            case 'quit'
+                notready=false;
+
+        end
     end
-
     cd(mydir)
 end
