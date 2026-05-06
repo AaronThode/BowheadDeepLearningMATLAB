@@ -184,8 +184,11 @@ function onFeatureSelect(src,~)
         set(udtmp.h,'CData',double(udtmp.CData(udtmp.Igood)));  %Update color
         minval=min(udtmp.h.CData);
         maxval=max(udtmp.h.CData);
+        hh = findobj(fig,'type','colorbar');
+        set(hh.Label,"String",sel, "FontSize",12,"FontWeight","bold")
+
         clim(udtmp.ax,[minval maxval]);
-        
+
         fig.UserData = udtmp;
         
 end
@@ -304,8 +307,8 @@ end
         % Parse edited text like "min max" and set axes limits; update sliders
         ud = fig.UserData;
         str = strtrim(get(src,'String'));
-        vals = sscanf(str,'%f %f');
-        if numel(vals)==2 && vals(1)
+        vals = str2num(str);
+        if numel(vals)==2 
             if src==ud.edtX
                 xlim(ud.ax,[vals(1) vals(2)]);
                 set(ud.sldX,'Value',max(abs(vals)));

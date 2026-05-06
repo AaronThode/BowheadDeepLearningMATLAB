@@ -34,11 +34,11 @@ N_manual=length(temp_Imanual);
 N_unmarked=length(temp_Iauto);
 fprintf('Out of %i original detections %i have not already been edited... \n\t Of those remaining there are %i manual calls and %i unmarked signals in this sample \n', ...
     N_all_subsamples,length(Icluster),N_manual,N_unmarked);
-
+pause(0.5)
 %Display manual examples
 hh=ud.ax;
-hh.Title.String=sprintf('%i Samples in range, %i manual, %i auto', ...
-    length(Icluster),N_manual,N_unmarked);
+hh.Title.String=sprintf('%i originals, %i Samples editable, %i manual, %i auto', ...
+    N_all_subsamples,length(Icluster),N_manual,N_unmarked);
 hh.Title.FontWeight="bold";
 hh.Title.FontSize=14;
 drawnow

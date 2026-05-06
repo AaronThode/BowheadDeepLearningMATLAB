@@ -9,7 +9,7 @@ addpath .
 
 %%%Data review parameters
 zlimm_want=[-5 5];  %%%Restrict zaxis when selecting samples
-color_label='ICI';  %%How to label colors in 3D scattering plot.
+color_label='iscall';  %%How to label colors in 3D scattering plot.
 
 % fpeak:
 %         tpeak:
@@ -30,8 +30,8 @@ force_labels_recompute=false;
 ignore_edits_more_recent_than=datetime(2026,5,1,21,0,0);  %exclude editing previously edited
 %   samples if they were made more recently than this
 %   time
-display_manual=false;  %If true, plot spectrogram images of known manual calls
-display_auto=true;  %If true, plot spectrogram images of known manual calls
+display_manual=true;  %If true, plot spectrogram images of known manual calls
+display_auto=false;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
 
 
@@ -115,7 +115,6 @@ for Idir=1:length(dir_names)
     %           reviewers.
     %       data.feature.type     are the labels after review (cleaned data set)
     %           Always has full classification labels.
-    %       gcf().UserData.CData:  subset of samples being plotted.
     %   Related structures:
     %       data.date_adjusted:   datetime of when data.feature.type was
     %                           altered
@@ -201,41 +200,65 @@ for Idir=1:length(dir_names)
 
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
-    %ud=scatter3_limits_with_azel_edits(x_norm,x_color,[31 -81],zlimm_want);
-    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,data.date_adjusted,[78 90],zlimm_want); colormap jet
-
-    %myfig=gcf;
-
+     myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,data.date_adjusted,[78 90],zlimm_want); colormap jet
+    
     disp('Select rotation check and rotate figure');
     drawnow;
 
-    initial_azi=0;
-    initial_el=-5;
+    initial_azi=78;
+    initial_el=90;
     alpha_value=0.2;
-    %create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
+    create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
     % create_gif=[];
-    % ifempty(create_gif)
-    %     titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
-    %     GIF_movie_demo(x(Itype,:),x_color(Itype),alpha_value,titstr,initial_azi,initial_el);
-    % end
-
-
-    % list = {'Select and edit subsamples','Do nearest-neighbor analysis','Quit'};
-    %[indx,tf] = listdlg('ListString',list, ...
-    %    'PromptString','Adjust view(rotation,features, filtering) and then select option:', ...
-    %    'SelectionMode','single','InitialValue',1);
+     if ~isempty(create_gif)
+         titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
+        GIF_movie_demo(x_norm,data.features.iscall,alpha_value,titstr,initial_azi,initial_el);
+     end
 
 
     group = "Updates";
     pref = "Conversion";
     tit = "Choose Operation";
     quest = "After adjusting figure, choose an option:";
-    pbtns = ["Edit","Nearest Neighbor Compute","Save","Quit"];
+    pbtns = ["Edit","Nearest Neighbor Compute","Print","Save","Quit"];
 
     notready=true;
     while notready
         [operation_chc,tf] = uigetpref(group,pref,tit,quest,pbtns);
         switch operation_chc
+            case 'print'
+                ud=myfig.UserData;
+                fig_print=figure;
+                ax_print=axes;
+                newobj=copyobj(ud.h,ax_print);
+
+                Hax = findobj(myfig,'type','axes');
+                
+                set(ax_print,'XLim',Hax.XLim);
+                set(ax_print,'YLim',Hax.YLim);
+                set(ax_print,'ZLim',Hax.ZLim);
+                
+                colormap jet; grid on;
+                hh=colorbar; 
+                set(hh.Label,"String",ud.selectedFeatureField, "FontSize",12,"FontWeight","bold")
+                clim([ min(ud.CData)  max(ud.CData)]);
+                
+                xlabel('UMAP 1');ylabel('UMAP 2');
+
+
+                titstr= sprintf('latent_embeddings_%id_%s_MATLAB',UMAP_dim,dataset_chc);
+                title(sprintf('%s, Azimuth: %s, Elevation: %s, Filtering %s between %s and %s', ...
+                    titstr,ud.edtAz.String,ud.edtEl.String, ...
+                    ud.selectedFilterField,ud.edtFeature1.String,ud.edtFeature2.String),'interp','none');
+                set(gca,'FontWeight','bold','FontSize',14);
+                hh = findobj(myfig,'type','colorbar');
+                set(hh.Label,"String",ud.selectedFeatureField, "FontSize",12,"FontWeight","bold")
+                printname=sprintf('%s_Azi%s_El%s_Feat.%s_Filt.%s.jpg',titstr, ...
+                    ud.edtAz.String,ud.edtEl.String, ...
+                    ud.selectedFeatureField,ud.selectedFilterField);
+
+                orient landscape
+                print('-djpeg','-r300',printname);
             case 'edit'
                 disp('Editing...')
                 select_and_display_samples_from_UMAP_display;
@@ -248,10 +271,9 @@ for Idir=1:length(dir_names)
                 Idx=knnsearch(data.latent_embeddings(Igood,:), ...
                     data.latent_embeddings(Igood,:),'K',Neighbors,'IncludeTies',true,'Distance','euclidean');
 
-
-
                 threshold=unique([ 0 0:1/Neighbors:1 1]);
-                strrr='kr';
+                strrr='kr';strr2='bg';
+                figure;
                 for I=1:2  %1 is original manual labels, 2 is latest relabel
                     switch I
                         case 1
@@ -272,24 +294,35 @@ for Idir=1:length(dir_names)
 
                     recall=zeros(1,length(threshold));precision=recall;
                     for Ithresh=1:length(threshold)
-                        detected_positives=sum(score(Icall)>=threshold(Ithresh));
-                        false_positives=sum(score(Ino_call)>=threshold(Ithresh));
+                        detected_positives=sum(score(Igood(Icall))>=threshold(Ithresh));
+                        false_positives=sum(score(Igood(Ino_call))>=threshold(Ithresh));
                         recall(Ithresh)=detected_positives./total_positives_in_dataset;
                         precision(Ithresh)=detected_positives./(detected_positives+false_positives);
 
                     end
 
-                    figure(100);
+                  
                     subplot(1,2,1);hold on
-                    plot(recall,precision,[strrr(I) '-o']);grid on;
+                    plot(recall,precision,[strrr(I) '-o']);grid on;hold on
                     xlabel('Recall');ylabel('Precision');
                     xlim([0 1]);ylim([0 1]);
                     subplot(1,2,2);hold on
                     plot(1-recall,1-precision,[strrr(I) '-o']);grid on;
                     xlabel('Miss fraction');ylabel('False discovery rate (Fraction of calls that are not calls)');
                     xlim([0 1]);ylim([0 1]);
-                end
-                legend('original','edited');
+
+                    %%%Estimate precision for realistic data set
+                    R1=sum(Ino_call)/sum(Icall);
+                    R2=7.8;  %Ratio of false hits to manual count in full dataset
+                    precision_estimated=precision.*R1./(R2.*(1-precision)+R1.*precision);
+                    subplot(1,2,1)
+                    plot(recall,precision_estimated,[strr2(I) '-o']);
+                    subplot(1,2,2);
+                    plot(1-recall,1-precision_estimated,[strr2(I) '-o']);grid on;hold on
+                   
+
+                end %I
+                legend('original','estimated bulk: original','edited','estimated bulk: edited');
                 title(sprintf('Dataset length: %i samples (%i calls, %i false)',length(Igood),sum(Icall),sum(Ino_call)))
                 
                 ud.features.score=score;
