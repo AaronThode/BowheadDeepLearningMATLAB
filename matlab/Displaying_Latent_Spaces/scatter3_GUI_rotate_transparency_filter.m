@@ -1,7 +1,7 @@
 
 
 
-function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,date_adjusted,default_view,zlimm_want)
+function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,zlimm_want)
 % Scatter3 with independent X,Y,Z sliders + edit boxes for axis limits
 % and edit boxes for Azimuth and Elevation
 % Alpha (transparency) slider + edit
@@ -34,7 +34,6 @@ h.MarkerFaceAlpha=alpha_value;
 %to change shape of points that have changed their type, but this would
 %require a separate scatterplot.  Consider using a unique color...
 
-%Iadjusted=find(date_adjusted-min(date_adjusted)>hours(24)); 
 
 xlabel('x');ylabel('y');zlabel('z');
 axis(ax,'equal')
@@ -224,7 +223,11 @@ end
         if minval==maxval
             maxval=maxval+0.1;
         end
+        
         clim(udtmp.ax,[minval maxval]);
+
+       
+        %changed_from_manual_to_auto=length()
         udtmp.ddFilter_text.String=sprintf('Filter Feature %i samples',length(udtmp.Igood));
         warning on
         fig.UserData = udtmp;

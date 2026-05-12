@@ -27,11 +27,11 @@ dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
 
-ignore_edits_more_recent_than=datetime(2026,5,1,21,0,0);  %exclude editing previously edited
+ignore_edits_more_recent_than=datetime(2026,5,18,19,0,0);  %exclude editing previously edited
 %   samples if they were made more recently than this
 %   time
-display_manual=true;  %If true, plot spectrogram images of known manual calls
-display_auto=false;  %If true, plot spectrogram images of known manual calls
+display_manual=false;  %If true, plot spectrogram images of known manual calls
+display_auto=true;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
 
 
@@ -200,7 +200,7 @@ for Idir=1:length(dir_names)
 
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
-     myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,data.date_adjusted,[78 90],zlimm_want); colormap jet
+     myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
     
     disp('Select rotation check and rotate figure');
     drawnow;
@@ -208,8 +208,8 @@ for Idir=1:length(dir_names)
     initial_azi=78;
     initial_el=90;
     alpha_value=0.2;
-    create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
-    % create_gif=[];
+    %create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
+     create_gif=[];
      if ~isempty(create_gif)
          titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
         GIF_movie_demo(x_norm,data.features.iscall,alpha_value,titstr,initial_azi,initial_el);

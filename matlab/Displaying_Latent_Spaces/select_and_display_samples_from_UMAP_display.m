@@ -93,4 +93,8 @@ set(myfig,'UserData',ud);
 fhandle=myfig.UserData.edtFeature1.Callback;
 fhandle(myfig.UserData.edtFeature1);
 
-
+%%%Update info on edited samples
+former_manual=(data.features.type_org>0 & ~data.features.iscall);
+former_auto=(data.features.type_org==0 & data.features.iscall);
+fprintf('Call samples removed: %i, Call samples added: %i, total changes: %i\n\n', ...
+    sum(former_manual),sum(former_auto),sum(data.features.type~=data.features.type_org));

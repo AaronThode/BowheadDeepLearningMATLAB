@@ -231,7 +231,7 @@ end %JJ
 
 %%%%General input box window for call review...
 prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2', ...
-    'New type [11 is unknown call type, 12 is uncertain if call:', ...
+    'New type [11 is unknown call type\n, -3 is uncertain if call, -2 if call+airgun, -1 if multiple calls:', ...
     'Enter an index to play sound...', ...
     'Enter an index to review linked DASARs..'};
 dlgtitle = 'Input';
@@ -239,7 +239,7 @@ fieldsize = [1 45; 1 45; 1 30; 1 30];
 if strcmpi(FigureName,'manual')
     %  Ndefault=min([30 Nsamples]);
     Ndefault=Nsamples;
-    definput = {sprintf('1:%i',Ndefault),'0','-1','-1'};  %Turning whale call into non-whale call
+    definput = {sprintf('1:%i',Ndefault),'-2','-1','-1'};  %Turning whale call into call+airgun
 else
     definput = {'0','11','-1','-1'};  %Switching automated detection to unknown call
 
@@ -249,6 +249,10 @@ opts_view_other_window.WindowStyle='normal';
 Iwant(1)=-1;
 while Iwant(1)~=0
     call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
+    if isempty(call_review)
+        Iwant(1)=-1;
+        continue
+    end
     Iwant=str2num(call_review{1});
     while isempty(Iwant)
         call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
@@ -283,9 +287,11 @@ while Iwant(1)~=0
         for K=1:length(Iwant)
             fprintf('%s type %i changed to type %i...\n',fnames{Iwant(K)},type(Iindex(Iwant(K))),new_type);
         end
-        type(Iindex(Iwant))=new_type;
+
+        Ineww=Iindex(Iwant);
+        type(Ineww)=new_type;
         try
-            Ichanged=unique([Ichanged; Iindex(Iwant)]);
+            Ichanged=unique([Ichanged(:); Ineww(:)]);
         catch
             keyboard
         end
