@@ -43,7 +43,7 @@ switch hostname(1:end-1)
         end
     otherwise
         fprintf('Using Aaron''s local laptop\n')
-        gitpath = '/Users/thode/Desktop/ThodeLab';
+        %gitpath = '/Users/thode/Desktop/ThodeLab';
 
         manual_file='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Shell_Manual_Results';
         manual_file=[manual_file filesep 'All_manual_results.mat'];
