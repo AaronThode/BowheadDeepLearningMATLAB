@@ -9,13 +9,22 @@
 close all
 clear
 
-database_folder='../../Spectrogram_Image_Database.dir';
+[~,hostname] = system('hostname');
+[~,user_name]=system('whoami');
+
+switch hostname(1:end-1)
+
+    case 'ishmael.ucsd.edu'
+        database_folder='~/Public/Spectrogram_Image_Database.dir';
+    otherwise
+        database_folder='../../Spectrogram_Image_Database.dir';
+end
 data=load([database_folder '/Database_index.mat']);
 eval(sprintf('!mkdir %s/Unsupervised_database.dir',database_folder));
 eval(sprintf('!rm %s/Unsupervised_database.dir/*.mat',database_folder));
 
-Nsamples=100000;  %%Total data samples wanted in unsupervised database
-manual_fraction=0.99;  %%Fraction of samples that come from manual annotations
+Nsamples=200000;  %%Total data samples wanted in unsupervised database
+manual_fraction=(1/9);  %%Fraction of samples that come from manual annotations
 include_airguns=true;  %%If true include spectrograms of likely airgun signals
 
 year_want={'08','10','12','14'};%Note, must be in numerical order
