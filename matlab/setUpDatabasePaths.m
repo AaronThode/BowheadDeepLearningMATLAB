@@ -16,11 +16,23 @@ success=false;
 [~,hostname] = system('hostname');
 [~,user_name]=system('whoami');
 
- if strcmpi(deblank(user_name),'thode')
-     review_initials='AT';
- elseif strcmpi(deblank(user_name),'oboulais')
-     review_initials='OB';
- end
+%hostname =
+%
+%'Angels-MacBook-Air-6.local
+%'
+%
+%user_name
+%
+%5user_name =
+%'angel
+
+if strcmpi(deblank(user_name),'thode')
+    review_initials='AT';
+elseif strcmpi(deblank(user_name),'oboulais')
+    review_initials='OB';
+elseif strcmpi(deblank(user_name),'angel')
+    review_initials='AH';
+end
 
 
 
@@ -42,38 +54,59 @@ switch hostname(1:end-1)
             success=true;
         end
     otherwise
-        fprintf('Using Aaron''s local laptop\n')
-        %gitpath = '/Users/thode/Desktop/ThodeLab';
 
-        manual_file='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Shell_Manual_Results';
-        manual_file=[manual_file filesep 'All_manual_results.mat'];
+        if strcmpi(deblank(user_name),'angel')
+            fprintf('Using Angel''s local laptop\n');
+       
+             %%%Check if GSI data available
+            gsi_dir='/Volumes/Shared/Data/';
 
-        %%%Check if GSI data available
-        gsi_dir='/Volumes/Shared/Data/';
-
-        if ~exist(gsi_dir,'dir')==7
-            disp('No GSI directory found, cannot link DASARs or play sounds');
-        end
-
-        %%%Check if external drive.  If exists use it.
-        if exist('/Volumes/Thode_AI_Working_Disk/','dir')==7
+            if ~exist(gsi_dir,'dir')==7
+                disp('No GSI directory found, cannot link DASARs or play sounds');
+            end
+            
+            manual_file='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Shell_Manual_Results/';
+            manual_file=[manual_file filesep 'All_manual_results.mat'];
             disp('Using external Thode_AI_Working_Disk for latent space and images')
             latent_space_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32/';
             image_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/';
-
+            success=true;
+            
         else
-            disp('Using internal laptop storage for latent space.')
-            latent_space_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Bowhead_DL_Project/LD32/';
+            fprintf('Using Aaron''s local laptop\n')
+          
+            manual_file='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Shell_Manual_Results';
+            manual_file=[manual_file filesep 'All_manual_results.mat'];
 
-            %%%Check if external server mounted for images
-            if exist('/Volumes/Bowhead_DL_Project/','dir')==7
-                image_dir='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/';
-            else
-                disp('WARNING!  CANNOT DISPLAY IMAGES....')
+            %%%Check if GSI data available
+            gsi_dir='/Volumes/Shared/Data/';
 
+            if ~exist(gsi_dir,'dir')==7
+                disp('No GSI directory found, cannot link DASARs or play sounds');
             end
+
+            %%%Check if external drive.  If exists use it.
+            if exist('/Volumes/Thode_AI_Working_Disk/','dir')==7
+                disp('Using external Thode_AI_Working_Disk for latent space and images')
+                latent_space_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32/';
+                image_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/';
+
+            else
+                disp('Using internal laptop storage for latent space.')
+                latent_space_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Bowhead_DL_Project/LD32/';
+
+                %%%Check if external server mounted for images
+                if exist('/Volumes/Bowhead_DL_Project/','dir')==7
+                    image_dir='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/';
+                else
+                    disp('WARNING!  CANNOT DISPLAY IMAGES....')
+
+                end
+            end
+            success=true;
         end
-        success=true;
+
+        
 end
 
 if ~success
