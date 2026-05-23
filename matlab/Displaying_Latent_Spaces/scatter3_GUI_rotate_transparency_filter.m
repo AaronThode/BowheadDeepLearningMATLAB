@@ -64,13 +64,20 @@ edtZ = uicontrol(fig,'Style','edit','Position',[x0+w-130 y-22 editW 22],'String'
 y = y - gap;
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Azimuth (deg)','HorizontalAlignment','left');
 sldAz = uicontrol(fig,'Style','slider','Position',[x0 y-20 w-100 15],'Min',0,'Max',360,'Value',45,'Callback',@onControl);
-edtAz = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'String',sprintf('%.1f',45),'Callback',@onAzElEdit);
+edtAz = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'String',sprintf('%.1f',45),'Callback',@onAzElPEdit);
 
 % Elevation slider + edit
 y = y - gap;
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Elevation (deg)','HorizontalAlignment','left');
 sldEl = uicontrol(fig,'Style','slider','Position',[x0 y-20 w-100 15],'Min',-90,'Max',90,'Value',30,'Callback',@onControl);
-edtEl = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'String',sprintf('%.1f',30),'Callback',@onAzElEdit);
+edtEl = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'String',sprintf('%.1f',30),'Callback',@onAzElPEdit);
+
+% Pitch slider + edit
+y = y - gap;
+uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Pitch (deg)','HorizontalAlignment','left');
+sldP = uicontrol(fig,'Style','slider','Position',[x0 y-20 w-100 15],'Min',0,'Max',360,'Value',30,'Callback',@onControl);
+edtP = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'String',sprintf('%.1f',30),'Callback',@onAzElPEdit);
+
 
 %Transparency slider
 y = y - gap; % position above other controls
@@ -141,6 +148,7 @@ ud.Igood=Igood;  %%%Points that meet the filter criteria...
 ud.sldX = sldX; ud.sldY = sldY; ud.sldZ = sldZ;
 ud.edtX = edtX; ud.edtY = edtY; ud.edtZ = edtZ;
 ud.sldAz = sldAz; ud.sldEl = sldEl; ud.edtAz = edtAz; ud.edtEl = edtEl;
+ud.sldP = sldP;  ud.edtP= edtP; 
 ud.chk = chk;
 ud.sldAlpha = sldAlpha;
 ud.edtAlpha = edtAlpha;
@@ -302,6 +310,7 @@ end
         % If az/el sliders changed, sync edit boxes
         set(ud.edtAz,'String',sprintf('%.1f', get(ud.sldAz,'Value')));
         set(ud.edtEl,'String',sprintf('%.1f', get(ud.sldEl,'Value')));
+        set(ud.edtP,'String',sprintf('%.1f', get(ud.sldP,'Value')));
         updateEditsFromAxes();
         applyRotationAndView();
     end
@@ -329,7 +338,7 @@ end
         end
     end
 
-    function onAzElEdit(src,~)
+    function onAzElPEdit(src,~)
         % Parse single numeric az or el, update slider and view/transform
         ud = fig.UserData;
         v = str2double(get(src,'String'));
@@ -338,10 +347,14 @@ end
             set(src,'String',sprintf('%.1f', get(src==ud.edtAz && ud.sldAz || ud.sldEl,'Value')));
             return
         end
-        if src==ud.edtAz
+        if src==ud.edtAz 
             v = mod(v,360); % keep 0-360
             set(ud.sldAz,'Value',v);
             set(ud.edtAz,'String',sprintf('%.1f',v));
+        elseif src== ud.edtP
+            v = mod(v,360); % keep 0-360
+            set(ud.sldP,'Value',v);
+            set(ud.edtP,'String',sprintf('%.1f',v));
         else
             v = max(min(v,90),-90);
             set(ud.sldEl,'Value',v);
@@ -370,9 +383,10 @@ end
         ud = fig.UserData;
         az = get(ud.sldAz,'Value');
         el = get(ud.sldEl,'Value');
+        p = get(ud.sldP,'Value');
         doTransform = get(ud.chk,'Value');
         if doTransform
-            R = rotationMatrix(az,el);
+            R = rotationMatrix(az,el,p);
             Xt = (R * ud.X0')';
             set(ud.h,'XData',Xt(ud.Igood,1),'YData',Xt(ud.Igood,2),'ZData',Xt(ud.Igood,3));
             % keep camera fixed in transformed-data mode
@@ -393,9 +407,10 @@ end
     end
 end
 
-function R = rotationMatrix(az,el)
-az = deg2rad(az); el = deg2rad(el);
+function R = rotationMatrix(az,el,p)
+az = deg2rad(az); el = deg2rad(el);p = deg2rad(p);
 Rz = [ cos(az) -sin(az) 0; sin(az) cos(az) 0; 0 0 1];
 Ry = [ cos(el) 0 sin(el); 0 1 0; -sin(el) 0 cos(el)];
-R = Ry * Rz;
+Rx=[1 0 0; 0 cos(p) -sin(p); 0 sin(p) cos(p)];
+R = Rx* Ry * Rz;
 end

@@ -199,8 +199,8 @@ for Idir=1:length(dir_names)
 
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
-     myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
-    
+    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
+
     disp('Select rotation check and rotate figure');
     drawnow;
 
