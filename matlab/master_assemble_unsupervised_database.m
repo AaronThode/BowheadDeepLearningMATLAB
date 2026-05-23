@@ -5,6 +5,12 @@
 %  You can control what specific years, sites, and DASARs are incorporated.
 %   However, all days from a particular year/site/DASAR are included, since
 %   the specific dates are specific to a given year/site/DASAR combo.
+%
+%   The 'manual_fraction' controls what fraction of transients are
+%   associated with manual annotations.
+%   However, both manual and other calls are selected from the same
+%   proportion as their representation in the database folders...
+%
 
 close all
 clear
@@ -31,6 +37,7 @@ folder_names={'Event_sounds.dir','Manually_selected_bowhead_calls.dir'};
 for I=1:length(data.DASAR_strings)
     data.DASAR_strings_cell{I}=data.DASAR_strings(I);
 end
+
 folder_fractions=[1-manual_fraction manual_fraction];
 
 %%%Trim down database indicies to match requested subsets above
@@ -89,9 +96,11 @@ for Iyear=1:length(year_want)
                     file_fraction=data_sub.file_fraction.manual;
                 end
 
-                %%%%How many samples are wanted from each folder
+                %%%%How many samples are wanted from each folder%%%%
                 %  row is DASAR, column is 'D*.dir' folder
                 Nsamples_want=floor(folder_fractions(Ifold)*Nsamples*squeeze(file_fraction(Iyear,Isite,Iday,:,:)));
+                %%%%%%%%%%%%%%%%%%%%%%%%
+
                 Nsamples_running_count=Nsamples_running_count+sum(Nsamples_want(:));
                 Ndd=size(Nsamples_want,2);
                 for Idd=1:Ndd  %%subfolders

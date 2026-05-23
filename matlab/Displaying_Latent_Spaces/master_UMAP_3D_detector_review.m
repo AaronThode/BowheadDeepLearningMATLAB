@@ -26,11 +26,11 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
+ignore_edits_more_recent_than=datetime(2026,5,29,19,0,0);  %exclude editing previously edited
 
-ignore_edits_more_recent_than=datetime(2026,5,18,19,0,0);  %exclude editing previously edited
 %   samples if they were made more recently than this
 %   time
-display_manual=false;  %If true, plot spectrogram images of known manual calls
+display_manual=true;  %If true, plot spectrogram images of known manual calls
 display_auto=true;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
 
@@ -41,7 +41,6 @@ UMAP_dim=3;   %Dimension of UMAP to compute
 n_neighbors=15;
 min_dist=0.1;
 save_template=false;
-
 
 %[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 [latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
