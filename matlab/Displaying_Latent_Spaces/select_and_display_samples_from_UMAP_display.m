@@ -69,7 +69,14 @@ clear figgs f
 
 %%%Ireviewed are indicies that have been reviewed,
 %%% Ichanged are indicies that have been changed...
-Ireviewed=unique([Icluster(temp_Imanual) Icluster(temp_Iauto)]);
+
+try
+    Ireviewed=unique([Icluster(temp_Imanual); Icluster(temp_Iauto)]);
+
+catch
+    Ireviewed=unique([Icluster(temp_Imanual) Icluster(temp_Iauto)]);
+
+end
 %Ichanged=unique([Ichanged_manual Ichanged_auto]);
 data.date_adjusted(Ireviewed)=datetime('now');
 data.reviewer(Ireviewed)=reviewer_initials;
@@ -82,11 +89,11 @@ ud.features.iscall=data.features.iscall;
 figure(myfig);
 set(myfig,'UserData',ud);
 
-%  if strcmpi(ud.selectedFeatureField,'iscall')
-%     Igood=find(ud.features.iscall>0);
-%     ud.Igood=Igood;
-%     data.Igood=Igood;
-%     set(myfig,'UserData',ud);
+%%%Update the complete features vector
+data.features_org.type(Ifull_dataset_index)=data.features.type;
+data.date_adjusted_org(Ifull_dataset_index)=data.date_adjusted;
+data.reviewer_org(Ifull_dataset_index,:)=data.reviewer;
+data.features_org.iscall(Ifull_dataset_index)=data.features.iscall;
 
 %%%Update the internal 'Igood' variable stored in UserData.
 
