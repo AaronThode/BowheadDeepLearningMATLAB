@@ -35,6 +35,11 @@ display_auto=true;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
 
 
+%%%Prefiltering parameters...
+feature_filter='tpeak';
+feature_filter_range=[0 1];
+
+
 %%%UMAP parameters
 addpath ../../../umapAndEppFileExchange_v4_6/umap
 UMAP_dim=3;   %Dimension of UMAP to compute
@@ -53,17 +58,7 @@ switch dataset_chc
         images_dir{1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
 
     case 'auto'
-        %Original result, with samples not centered in time...
-        %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
-        %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
-
-        %%%Baseline
-        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
-        %dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
-        %Centered result
-        %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir'];
-        %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
-
+        
         %%%Revised centered images with everything labeled properly
         clear dir_names
         dir_names={[latent_space_dir 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/']};
@@ -79,10 +74,11 @@ for Idir=1:length(dir_names)
     %%MATLAB UMAP processing
     cd([dir_names{Idir} filesep 'MATLAB'])
 
-    if  force_UMAP_recompute
+    file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+    if ~exist(file_want,'file')
         file_want=sprintf('latent_embeddings.mat');
     else
-        file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+        
     end
 
     fpath = fullfile(pwd, file_want);    % current folder + filename
@@ -92,19 +88,7 @@ for Idir=1:length(dir_names)
         error('File "%s" not found in current folder: %s', file_want, pwd);
     end
 
-    %%%Compute UMAP results...
-    field_want=sprintf('umap_embeddings_%id',UMAP_dim);
-
-    if force_UMAP_recompute
-        [x, umap, clusterIds, extras]= ...
-            run_umap(double(data.latent_embeddings),'n_components', UMAP_dim,'min_dist',min_dist,'n_neighbors',n_neighbors,'verbose','text');
-        data.(field_want)=x;
-        save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
-    else
-        x=data.(field_want);
-    end
-
-    %%If stored MAT file does not have features stored in convenient form,
+     %%If stored MAT file does not have features stored in convenient form,
     %%add it!
     %  features is a structure where every field is a vector with same
     %  number of elements as data.x.
@@ -119,63 +103,57 @@ for Idir=1:length(dir_names)
     %                           altered
     %       data.reviewer:  e.g.. 'AT', initials of reviewer.
 
-
     if force_labels_recompute || ~isfield(data.features,'type')
         disp('Adding feature vectors to MAT file before continuing...');
-        Npp=size(x,1);
-        for II=1:Npp
-
-            if rem(II,100)==0,fprintf('%6.2f percent done\n', 100*II/Npp);end
-            fname=data.original_filenames{II};
-
-            try
-                if strcmp(dataset_chc,'manual')
-                    imgdata=load(sprintf('%s%s%s',images_dir{Idir},filesep,fname),'features');
-                else
-                    if strcmp(fname(end-4),'0')
-                        imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fname),'features');
-                    else
-                        imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,fname),'features');
-                    end
-                end
-            catch
-                fprintf('Could not load %s...\n',fname);
-            end
-            if II==1
-                feature_names=fieldnames(imgdata.features);
-                for Ifeature=1:length(feature_names)
-                    data.features.(feature_names{Ifeature})=ones(Npp,1);
-                end
-                data.features.type=ones(Npp,1);
-            end
-
-            for Ifeature=1:length(feature_names)
-                try
-                    data.features.(feature_names{Ifeature})(II)=imgdata.features.(feature_names{Ifeature});
-                catch
-                    data.features.(feature_names{Ifeature})(II)=-1;
-                end
-                data.features.type(II)=str2double(extract(fname,28));
-            end
-        end %%II
-        data.features.type_org=data.features.type;
-        data.date_adjusted=repmat(datetime('now'),length(data.features.type),1);
-        data.features.score=zeros(size(data.features.type));  %Score is a feature!
-        data.reviewer=repmat("XX",length(data.features.type),1);
-
-        data.features=orderfields(data.features);
-
-        %%%Put iscall last so it is default color label in plot...
-        fieldname=fieldnames(data.features);
-        J_iscall=find(contains(fieldname,'iscall'));
-        data.features=orderfields(data.features,[1:(J_iscall-1) (J_iscall+1):length(fieldname) J_iscall]);
+        update_feature_labels;
         save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
     end  %Advanced labels
 
     data.features.iscall=(data.features.type>0);
 
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% Prefilter data before running UMAP and plotting space.
+    %%%  Allows exploration of subsets of the data...
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    Nsamples_total=size(data.latent_embeddings,1);
+    filter_choices=fieldnames(data.features);
 
-    if UMAP_dim==5
+
+    Ifeature=contains(filter_choices,feature_filter);
+    if ~any(Ifeature) %'none' or other string
+        disp('Processing all samples in file...')
+        Ifull_dataset_index=1:Nsamples_total;
+    else
+        fprintf('Pre-filtering samples with feature %s between %4.1f and %4.1f...\n',feature_filter,feature_filter_range(1),feature_filter_range(2));
+        Ifull_dataset_index=find((data.features.(filter_choices{Ifeature})>=feature_filter_range(1) ) &  (data.features.(filter_choices{Ifeature})<=feature_filter_range(2)));
+    end
+
+    data.features_org=data.features;
+    data.date_adjusted_org=data.date_adjusted;
+    data.reviewer_org=data.reviewer;
+    for Ifea=1:length(filter_choices)
+        data.features.(filter_choices{Ifea})=data.features.(filter_choices{Ifea})(Ifull_dataset_index);
+    end
+   
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%Compute UMAP results...
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%
+    field_want=sprintf('umap_embeddings_%id',UMAP_dim);
+
+    if force_UMAP_recompute || length(Ifull_dataset_index)<Nsamples_total
+        disp('Re-running UMAP...')
+        [x, umap, clusterIds, extras]= ...
+            run_umap(double(data.latent_embeddings(Ifull_dataset_index,:)),'n_components', UMAP_dim,'min_dist',min_dist,'n_neighbors',n_neighbors,'verbose','text');
+        data.(field_want)=x;
+        %save_latent_space;
+        
+    else
+        x=data.(field_want);
+        x=x(Ifull_dataset_index,:);
+    end
+
+     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
         %by 3 matrix)
@@ -186,19 +164,21 @@ for Idir=1:length(dir_names)
         %  explained: percent varience explained by PCA component.
         %  Used to judge which components to keep
         x=score;
-    end
+     end
+
+   
 
     cd(mydir)
 
     x_norm=(x-mean(x))./std(x);
-    x_color=data.features.(color_label);
+    %x_color=data.features.(color_label);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%Plot all detections with UI controls%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     %%%Optional flip to try to get better view of data...
-    x_norm=-x_norm;
+    %x_norm=-x_norm;
     myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
 
     disp('Select rotation check and rotate figure');
@@ -332,7 +312,7 @@ for Idir=1:length(dir_names)
 
             case 'save'
                 disp('Saving...')
-                save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+                save_latent_space;
             case 'quit'
                 notready=false;
 
