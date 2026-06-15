@@ -65,7 +65,9 @@ switch hostname(1:end-1)
                 disp('No GSI directory found, cannot link DASARs or play sounds');
             end
             
-            manual_file='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Shell_Manual_Results/';
+            %manual_file='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Shell_Manual_Results/';
+            manual_file='/Volumes/Thode_AI_Working_Disk/Shell_Manual_Results/';
+           
             manual_file=[manual_file filesep 'All_manual_results.mat'];
             disp('Using external Thode_AI_Working_Disk for latent space and images')
             latent_space_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32/';

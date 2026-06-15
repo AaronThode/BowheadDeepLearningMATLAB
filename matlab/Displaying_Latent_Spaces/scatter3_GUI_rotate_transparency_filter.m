@@ -42,6 +42,11 @@ colorbar('location','south')
 
 % UI positions
 x0 = 1300; y = 420+150; w = 320; htxt = 20; gap = 50; editW = 80;
+[~,user_name]=system('whoami');
+if contains(user_name,'angel')
+    disp('Adjusting controls on Angels computer...')
+    x0=x0-300;
+end
 
 % X limit label, slider, edit
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','X limit [min max]','HorizontalAlignment','left');
