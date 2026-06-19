@@ -203,6 +203,8 @@ for JJ=1:Nsamples
         else  %I==2 and not plot_NTV
             continue
         end
+        ax =gca;
+        ax.Toolbar.Visible='off';
         ylim([0 500]);
         axis xy
         set(gca,'fontweight','bold','fontsize',14)

@@ -26,7 +26,7 @@ Nsamples=length(Idx_all);
 threshold=unique([ 0 0:1/Neighbors:1 1]);
 strrr='kr';strr2='bg';
 figure;
-for I=1:2  %1 is original manual labels, 2 is latest relabel
+for I=1:2  %1 is all samples, 2 is restricted duration
     train.iscall=train.features.type_org>0 & train.features.type_org<12;
     test.iscall=test.features.type_org>0 & test.features.type_org<12;
     switch I
@@ -62,7 +62,6 @@ for I=1:2  %1 is original manual labels, 2 is latest relabel
 
     end
 
-
     subplot(1,2,1);hold on
     plot(recall,precision,[strrr(I) '-o']);grid on;hold on
     xlabel('Recall');ylabel('Precision');
@@ -88,3 +87,4 @@ end %I
  legend('original','duration restricted');
  
                
+print -djpeg -r300 evaluation_result.jpg
