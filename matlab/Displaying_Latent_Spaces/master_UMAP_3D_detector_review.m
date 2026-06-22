@@ -26,7 +26,7 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
-ignore_edits_more_recent_than=datetime(2026,5,29,19,0,0);  %exclude editing previously edited
+ignore_edits_after_this_date=datetime(2026,6,10,19,0,0);  %exclude editing previously edited
 
 %   samples if they were made more recently than this
 %   time
@@ -171,10 +171,10 @@ for Idir=1:length(dir_names)
         data.features=orderfields(data.features,[1:(J_iscall-1) (J_iscall+1):length(fieldname) J_iscall]);
         save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
     end  %Advanced labels
-
+    
+    data.features.ischanged=(data.features.type~=data.features.type_org);
     data.features.iscall=(data.features.type>0);
-
-
+    
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
