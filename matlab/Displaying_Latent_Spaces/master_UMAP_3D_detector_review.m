@@ -2,10 +2,13 @@
 %master_UMAP_3D_detector_review.m
 
 
-close all
-clear all
+%close all
+%clear all
+
+[latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
+
 addpath ..
-addpath .
+%addpath .
 
 %%%Data review parameters
 zlimm_want=[-5 5];  %%%Restrict zaxis when selecting samples
@@ -26,7 +29,7 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 dataset_chc='auto';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
-ignore_edits_after_this_date=datetime(2026,6,10,19,0,0);  %exclude editing previously edited
+ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
 
 %   samples if they were made more recently than this
 %   time
@@ -43,7 +46,6 @@ min_dist=0.1;
 save_template=false;
 
 %[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
-[latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
 
 switch dataset_chc
     case 'manual'
@@ -199,7 +201,7 @@ for Idir=1:length(dir_names)
 
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
-    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[78 90],zlimm_want); colormap jet
+    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[60 -36],zlimm_want); colormap jet
 
     disp('Select rotation check and rotate figure');
     drawnow;
@@ -261,6 +263,8 @@ for Idir=1:length(dir_names)
             case 'edit'
                 disp('Editing...')
                 select_and_display_samples_from_UMAP_display;
+                disp(['Saving data to ' fpath]);
+                save(fpath,"-struct","data");
 
             case 'nearest neighbor compute'
                 disp('Computing nearest neighbor....')
@@ -332,8 +336,17 @@ for Idir=1:length(dir_names)
 
             case 'save'
                 disp('Saving...')
-                save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+                %save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+                disp(['Saving data to ' fpath]);
+                save(fpath,"-struct","data");
+                
             case 'quit'
+
+                yes=input('Save one final time?','s');
+                if contains(yes,'yes')
+                    disp(['Saving data to ' fpath]);
+                    save(fpath,"-struct","data");
+                end
                 notready=false;
 
         end
