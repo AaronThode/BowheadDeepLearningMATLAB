@@ -48,7 +48,15 @@ if contains(user_name,'angel')
     x0=x0-300;
 end
 
+% Add an edit box displaying current date and time
+y = y + gap;
+dtstr = datestr(datetime('now'),'yyyy-mm-dd HH:MM:SS');
+uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Freeze edits after','HorizontalAlignment','left');
+edt_time=uicontrol(fig,'Style','edit','Position',[x0+110 y 190 24],...
+    'String',dtstr,'Enable','inactive','BackgroundColor',[1 1 1]);
+
 % X limit label, slider, edit
+y = y - gap;
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','X limit [min max]','HorizontalAlignment','left');
 sldX = uicontrol(fig,'Style','slider','Position',[x0 y-20 w-140 15],'Min',-8,'Max',8,'Value',3,'Callback',@onControl);
 edtX = uicontrol(fig,'Style','edit','Position',[x0+w-130 y-22 editW 22],'String',sprintf('%.2f %.2f',-3,3),'Callback',@onEdit);
@@ -152,6 +160,7 @@ ud.X0 = X0; ud.h = h; ud.ax = ax;
 ud.Igood=Igood;  %%%Points that meet the filter criteria...
 ud.sldX = sldX; ud.sldY = sldY; ud.sldZ = sldZ;
 ud.edtX = edtX; ud.edtY = edtY; ud.edtZ = edtZ;
+ud.edt_time=edt_time;
 ud.sldAz = sldAz; ud.sldEl = sldEl; ud.edtAz = edtAz; ud.edtEl = edtEl;
 ud.sldP = sldP;  ud.edtP= edtP; 
 ud.chk = chk;

@@ -2,12 +2,13 @@
 %master_UMAP_3D_detector_review.m
 
 
-%close all
-%clear all
+close all
+clear all
+
+addpath ..
 
 [latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
 
-addpath ..
 %addpath .
 
 %%%Data review parameters

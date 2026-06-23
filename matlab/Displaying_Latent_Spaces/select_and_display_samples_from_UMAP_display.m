@@ -20,6 +20,13 @@ Icluster=Igood(Icluster);  %Index now relates fo full data set
 
 %%%Don''t count recent edits...
 N_all_subsamples=length(Icluster);
+try
+    ignore_edits_after_this_date=datetime(ud.edt_time.String);
+catch
+    disp('Fixing edit string')
+    ud.edt_time.String= datestr(datetime('now'),'yyyy-mm-dd HH:MM:SS');
+    ignore_edits_after_this_date=datetime(ud.edt_time.String);
+end
 I_old_enough=find(data.date_adjusted(Icluster)<ignore_edits_after_this_date);  %exclude editing previously edited
 
 Icluster=Icluster(I_old_enough);  %Index now relates fo full data set
