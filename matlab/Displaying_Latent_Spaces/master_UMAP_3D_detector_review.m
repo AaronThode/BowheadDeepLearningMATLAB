@@ -80,7 +80,7 @@ for Idir=1:length(dir_names)
     mydir=pwd;
 
     %%MATLAB UMAP processing
-    cd([dir_names{Idir} filesep 'MATLAB'])
+    %cd([dir_names{Idir} filesep 'MATLAB'])
 
     if  force_UMAP_recompute
         file_want=sprintf('latent_embeddings.mat');
@@ -88,11 +88,11 @@ for Idir=1:length(dir_names)
         file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
     end
 
-    fpath = fullfile(pwd, file_want);    % current folder + filename
-    if isfile(fpath)                  % or: exist(fpath,'file')==2
-        data = load(fpath);
+    edit_file_name = fullfile([dir_names{Idir} filesep 'MATLAB'], file_want);    % current folder + filename
+    if isfile(edit_file_name)                  % or: exist(fpath,'file')==2
+        data = load(edit_file_name);
     else
-        error('File "%s" not found in current folder: %s', file_want, pwd);
+        error('File "%s" not found in  folder: %s', file_want, [dir_names{Idir} filesep 'MATLAB']);
     end
 
     %%%Compute UMAP results...
@@ -102,7 +102,7 @@ for Idir=1:length(dir_names)
         [x, umap, clusterIds, extras]= ...
             run_umap(double(data.latent_embeddings),'n_components', UMAP_dim,'min_dist',min_dist,'n_neighbors',n_neighbors,'verbose','text');
         data.(field_want)=x;
-        save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
+        save(edit_file_name,"-struct","data");
     else
         x=data.(field_want);
     end
@@ -172,7 +172,7 @@ for Idir=1:length(dir_names)
         fieldname=fieldnames(data.features);
         J_iscall=find(contains(fieldname,'iscall'));
         data.features=orderfields(data.features,[1:(J_iscall-1) (J_iscall+1):length(fieldname) J_iscall]);
-        save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data")
+        save(edit_file_name,"-struct","data")
     end  %Advanced labels
     
     data.features.ischanged=(data.features.type~=data.features.type_org);
@@ -191,7 +191,7 @@ for Idir=1:length(dir_names)
         x=score;
     end
 
-    cd(mydir)
+    %cd(mydir)
 
     x_norm=(x-mean(x))./std(x);
     x_color=data.features.(color_label);
@@ -264,8 +264,8 @@ for Idir=1:length(dir_names)
             case 'edit'
                 disp('Editing...')
                 select_and_display_samples_from_UMAP_display;
-                disp(['Saving data to ' fpath]);
-                save(fpath,"-struct","data");
+                disp(['Saving data to ' edit_file_name]);
+                save(edit_file_name,"-struct","data");
 
             case 'nearest neighbor compute'
                 disp('Computing nearest neighbor....')
@@ -338,15 +338,15 @@ for Idir=1:length(dir_names)
             case 'save'
                 disp('Saving...')
                 %save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
-                disp(['Saving data to ' fpath]);
-                save(fpath,"-struct","data");
+                disp(['Saving data to ' edit_file_name]);
+                save(edit_file_name,"-struct","data");
                 
             case 'quit'
 
                 yes=input('Save one final time?','s');
                 if contains(yes,'yes')
-                    disp(['Saving data to ' fpath]);
-                    save(fpath,"-struct","data");
+                    disp(['Saving data to ' edit_file_name]);
+                    save(edit_file_name,"-struct","data");
                 end
                 notready=false;
 

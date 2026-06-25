@@ -53,7 +53,7 @@ y = y + gap;
 dtstr = datestr(datetime('now'),'yyyy-mm-dd HH:MM:SS');
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Freeze edits after','HorizontalAlignment','left');
 edt_time=uicontrol(fig,'Style','edit','Position',[x0+110 y 190 24],...
-    'String',dtstr,'Enable','inactive','BackgroundColor',[1 1 1]);
+    'String',dtstr,'Enable','on','BackgroundColor',[1 1 1]);
 
 % X limit label, slider, edit
 y = y - gap;
@@ -106,10 +106,13 @@ if exist('features','var') && isstruct(features)
 else
     fnames = {};
 end
+
+Idefault=find(contains(fnames,'iscall'));
+
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Feature Color','HorizontalAlignment','left');
 if ~isempty(fnames)
     ddFeature = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
-        'String',fnames,'Value',length(fnames),'Callback',@onFeatureSelect);
+        'String',fnames,'Value',Idefault,'Callback',@onFeatureSelect);
 else
     ddFeature = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
         'String',{'<no feature struct>'},'Value',1,'Enable','off');
@@ -122,7 +125,7 @@ y = y - gap; % position above other controls
 ddFilter_text=uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Filter Feature','HorizontalAlignment','left');
 if ~isempty(fnames)
     ddFilter = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
-        'String',fnames,'Value',length(fnames),'Callback',@onFilterSelect);
+        'String',fnames,'Value',Idefault,'Callback',@onFilterSelect);
 else
     ddFilter = uicontrol(fig,'Style','popupmenu','Position',[x0 y-20 200 22],...
         'String',{'<no feature struct>'},'Value',1,'Enable','off');
