@@ -20,7 +20,7 @@ end
 
 if isempty(head_info)
     disp('make_tile_spectrogram: Loading head info...');
-    head_info=load('../GSI_header_table.mat');
+    head_info=load('GSI_header_table.mat');
 end
 if ~exist('plot_NTV','var')
     plot_NTV=true;

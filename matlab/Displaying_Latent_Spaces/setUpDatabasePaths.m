@@ -91,7 +91,7 @@ switch hostname(1:end-1)
 
             %%%Check if external drive.  If exists use it.
             if exist('/Volumes/Thode_AI_Working_Disk/','dir')==7
-                disp('Using external Thode_AI_Working_Disk for latent space and images')
+                disp('Using external Thode_AI_Working_Disk for latent space files and images')
                 latent_space_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32/';
                 image_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/';
 

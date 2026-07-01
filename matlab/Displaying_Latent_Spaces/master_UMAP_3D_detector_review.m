@@ -5,7 +5,9 @@
 close all
 clear all
 
+if ~isdeployed
 addpath ..
+end
 
 [latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
 
@@ -90,6 +92,7 @@ for Idir=1:length(dir_names)
 
     edit_file_name = fullfile([dir_names{Idir} filesep 'MATLAB'], file_want);    % current folder + filename
     if isfile(edit_file_name)                  % or: exist(fpath,'file')==2
+        fprintf('Loading %s\n',edit_file_name);
         data = load(edit_file_name);
     else
         error('File "%s" not found in  folder: %s', file_want, [dir_names{Idir} filesep 'MATLAB']);
