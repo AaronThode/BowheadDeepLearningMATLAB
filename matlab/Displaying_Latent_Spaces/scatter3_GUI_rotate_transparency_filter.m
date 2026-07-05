@@ -46,6 +46,9 @@ x0 = 1300; y = 420+150; w = 320; htxt = 20; gap = 50; editW = 80;
 if contains(user_name,'angel')
     disp('Adjusting controls on Angels computer...')
     x0=x0-300;
+elseif contains(user_name,'raquel')
+    disp('Adjusting controls on Raquel computer...')
+    x0=x0-500;
 end
 
 % Add an edit box displaying current date and time

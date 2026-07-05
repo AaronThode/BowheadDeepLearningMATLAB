@@ -32,6 +32,10 @@ elseif strcmpi(deblank(user_name),'oboulais')
     review_initials='OB';
 elseif strcmpi(deblank(user_name),'angel')
     review_initials='AH';
+elseif contains(deblank(user_name),'shelby')
+    review_initials='SV'; %Shelby Villescaz-Best
+elseif contains(deblank(user_name),'raquel')
+    review_initials='RR'; %Raquel Ramos
 else
     review_initials='JT';
 end
@@ -57,28 +61,68 @@ switch hostname(1:end-1)
         end
     otherwise
 
-        if strcmpi(deblank(user_name),'angel')
-            fprintf('Using Angel''s local laptop\n');
-       
-             %%%Check if GSI data available
+        if contains(deblank(user_name),'shelby')
+
+            fprintf('Using Shelby VB local laptop...\n');
+
+            external_dir=['D:' filesep 'Bowhead_DL_Project'];
+            %%%Check if GSI data available
             gsi_dir='/Volumes/Shared/Data/';
 
             if ~exist(gsi_dir,'dir')==7
                 disp('No GSI directory found, cannot link DASARs or play sounds');
             end
-            
+
+            %manual_file='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Shell_Manual_Results/';
+            manual_file=[external_dir filesep 'Shell_Manual_Results' filesep];
+
+            manual_file=[manual_file filesep 'All_manual_results.mat'];
+            disp('Using external disk for latent space and images')
+            latent_space_dir=[external_dir filesep 'Networks_And_LatentSpaceRuns.dir' filesep 'LD32' filesep];
+            image_dir=[external_dir filesep 'BCB_Whale_Datasets' filesep];
+            success=true;
+
+        elseif contains(deblank(user_name),'raquel')
+            fprintf('Using Raquel R local laptop...\n');
+
+            external_dir=['D:' filesep 'Bowhead_DL_Project'];
+            %%%Check if GSI data available
+            gsi_dir='/Volumes/Shared/Data/';
+
+            if ~exist(gsi_dir,'dir')==7
+                disp('No GSI directory found, cannot link DASARs or play sounds');
+            end
+
+            manual_file=[external_dir filesep 'Shell_Manual_Results' filesep];
+
+            manual_file=[manual_file filesep 'All_manual_results.mat'];
+            disp('Using external disk for latent space and images')
+            latent_space_dir=[external_dir filesep 'Networks_And_LatentSpaceRuns.dir' filesep 'LD32' filesep];
+            image_dir=[external_dir filesep 'BCB_Whale_Datasets' filesep];
+            success=true;
+
+        elseif strcmpi(deblank(user_name),'angel')
+            fprintf('Using Angel''s local laptop\n');
+
+            %%%Check if GSI data available
+            gsi_dir='/Volumes/Shared/Data/';
+
+            if ~exist(gsi_dir,'dir')==7
+                disp('No GSI directory found, cannot link DASARs or play sounds');
+            end
+
             %manual_file='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Shell_Manual_Results/';
             manual_file='/Volumes/Thode_AI_Working_Disk/Shell_Manual_Results/';
-           
+
             manual_file=[manual_file filesep 'All_manual_results.mat'];
             disp('Using external Thode_AI_Working_Disk for latent space and images')
             latent_space_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32/';
             image_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/';
             success=true;
-            
+
         elseif strcmpi(deblank(user_name),'thode')
             fprintf('Using Aaron''s local laptop\n')
-          
+
             manual_file='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Shell_Manual_Results';
             manual_file=[manual_file filesep 'All_manual_results.mat'];
 
@@ -109,28 +153,10 @@ switch hostname(1:end-1)
             end
             success=true;
 
-        else
 
-             fprintf('Using an intern''s local laptop\n');
-       
-             %%%Check if GSI data available
-            gsi_dir='/Volumes/Shared/Data/';
-
-            if ~exist(gsi_dir,'dir')==7
-                disp('No GSI directory found, cannot link DASARs or play sounds');
-            end
-            
-            %manual_file='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Shell_Manual_Results/';
-            manual_file='/Volumes/Bowhead_Int/Bowhead_DL_Project/Shell_Manual_Results/';
-           
-            manual_file=[manual_file filesep 'All_manual_results.mat'];
-            disp('Using external disk Bowhead_Int for latent space and images')
-            latent_space_dir='/Volumes/Bowhead_Int/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32/';
-            image_dir='/Volumes/Bowhead_Int/Bowhead_DL_Project/BCB_Whale_Datasets/';
-            success=true;
         end
 
-        
+
 end
 
 if ~success

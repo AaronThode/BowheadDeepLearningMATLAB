@@ -6,7 +6,7 @@ close all
 clear all
 
 if ~isdeployed
-addpath ..
+    addpath ..
 end
 
 [latent_space_dir,image_dir,reviewer_initials,manual_file,gsi_dir] = setUpDatabasePaths;
@@ -42,7 +42,9 @@ display_NTV=false;
 
 
 %%%UMAP parameters
-addpath ../../../umapAndEppFileExchange_v4_6/umap
+%addpath ../../../umapAndEppFileExchange_v4_6/umap
+addpath(['..' filesep '..' filesep '..' filesep 'umapAndEppFileExchange_v4_6' filesep 'umap' filesep]);
+
 UMAP_dim=3;   %Dimension of UMAP to compute
 n_neighbors=15;
 min_dist=0.1;
@@ -50,32 +52,12 @@ save_template=false;
 
 %[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 
-switch dataset_chc
-    case 'manual'
-        dir_names={[Database_dir 'LD32/Autoencoder_v14_100E_32LD_32C_Manual_100K_Date20260122-190106.dir'], ...
-            [Database_dir 'LD16/Autoencoder_v14_100E_16LD_32C_Manual_100K_Date20260122-190056.dir']};
+clear dir_names
+dir_names={[latent_space_dir 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
+images_dir{1,1}=[image_dir 'Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
+images_dir{1,2}=[image_dir 'Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
 
-        images_dir{1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
 
-    case 'auto'
-        %Original result, with samples not centered in time...
-        %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214.dir'];
-        %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214.dir'];
-
-        %%%Baseline
-        %dir_names={[Database_dir '/LD32/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/']};
-        %dir_names={'../../../Bowhead_DL_Project/Autoencoder_v100E_32LD_32C_100kCombined_Centered_Date20260323-105320.dir/'};
-        %Centered result
-        %images_dir{1,1}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir'];
-        %images_dir{1,2}=[Database_dir '/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir'];
-
-        %%%Revised centered images with everything labeled properly
-        clear dir_names
-        dir_names={[latent_space_dir 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/']};
-        images_dir{1,1}=[image_dir 'Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
-        images_dir{1,2}=[image_dir 'Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
-
-end
 
 for Idir=1:length(dir_names)
     disp(dir_names{Idir})
