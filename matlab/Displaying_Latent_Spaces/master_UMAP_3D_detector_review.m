@@ -29,7 +29,7 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 %           ICI:
 %display_call_classifications=false;
 
-dataset_chc='auto';
+dataset_chc='eval';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
 ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
@@ -53,11 +53,18 @@ save_template=false;
 %[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 
 clear dir_names
-dir_names={[latent_space_dir 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
-images_dir{1,1}=[image_dir 'Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
-images_dir{1,2}=[image_dir 'Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
 
+switch dataset_chc
+    case 'train'
+        dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
+        images_dir{1,1}=[image_dir 'Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir'];
+        images_dir{1,2}=[image_dir 'Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir'];
 
+    case 'eval'
+        dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
+        images_dir{1,1}=[image_dir 'Unsupervised_database_Evaluation_200K_8Auto1Manual_ADG_Y08101214_centered_06May2026.dir'];
+      
+end
 
 for Idir=1:length(dir_names)
     disp(dir_names{Idir})
@@ -111,25 +118,15 @@ for Idir=1:length(dir_names)
     if force_labels_recompute || ~isfield(data.features,'type')
         disp('Adding feature vectors to MAT file before continuing...');
         Npp=size(x,1);
-        for II=1:Npp
+        for Image_index=1:Npp
 
-            if rem(II,100)==0,fprintf('%6.2f percent done\n', 100*II/Npp);end
-            fname=data.original_filenames{II};
+            if rem(Image_index,100)==0,fprintf('%6.2f percent done\n', 100*Image_index/Npp);end
+            fname=data.original_filenames{Image_index};
 
-            try
-                if strcmp(dataset_chc,'manual')
-                    imgdata=load(sprintf('%s%s%s',images_dir{Idir},filesep,fname),'features');
-                else
-                    if strcmp(fname(end-4),'0')
-                        imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fname),'features');
-                    else
-                        imgdata=load(sprintf('%s%s%s',images_dir{2},filesep,fname),'features');
-                    end
-                end
-            catch
-                fprintf('Could not load %s...\n',fname);
-            end
-            if II==1
+
+            imgdata=load_image_data(dataset_chc,images_dir,fname);
+
+            if Image_index==1
                 feature_names=fieldnames(imgdata.features);
                 for Ifeature=1:length(feature_names)
                     data.features.(feature_names{Ifeature})=ones(Npp,1);
@@ -139,11 +136,11 @@ for Idir=1:length(dir_names)
 
             for Ifeature=1:length(feature_names)
                 try
-                    data.features.(feature_names{Ifeature})(II)=imgdata.features.(feature_names{Ifeature});
+                    data.features.(feature_names{Ifeature})(Image_index)=imgdata.features.(feature_names{Ifeature});
                 catch
-                    data.features.(feature_names{Ifeature})(II)=-1;
+                    data.features.(feature_names{Ifeature})(Image_index)=-1;
                 end
-                data.features.type(II)=str2double(extract(fname,28));
+                data.features.type(Image_index)=str2double(extract(fname,28));
             end
         end %%II
         data.features.type_org=data.features.type;
@@ -328,8 +325,9 @@ for Idir=1:length(dir_names)
                 
             case 'quit'
 
-                yes=input('Save one final time?','s');
-                if contains(yes,'yes')
+                %yes=input('Save one final time?','s');
+                yes = questdlg('Save one final time?');
+                if contains(lower(yes),'yes')
                     disp(['Saving data to ' edit_file_name]);
                     save(edit_file_name,"-struct","data");
                 end

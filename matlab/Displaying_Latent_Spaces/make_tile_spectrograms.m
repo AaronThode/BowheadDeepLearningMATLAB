@@ -73,22 +73,11 @@ for JJ=1:Nsamples
 
     ctime_call=posixtime(tabs_call);  %c-time of call event in local time zone (same as filename)
 
-    if strcmp(dataset_chc,'manual')
-        imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)}));
-    else
-        try
-            if strcmp(fnames{(JJ)}(end-4),'0')
-                load_name=sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)});
-                imgdata=load(load_name);
-            else
-                load_name=sprintf('%s%s%s',images_dir{2},filesep,fnames{(JJ)});
-                imgdata=load(load_name);
-            end
-        catch
-            fprintf('%s not in directory...\n',load_name);
-            continue
-        end
+    [imgdata,found_file]=load_image_data(dataset_chc,images_dir,fnames{JJ});
+    if ~found_file
+        continue
     end
+   
 
     imgdata.features.fpeak=imgdata_min_freq+imgdata.features.fpeak;
 
@@ -366,22 +355,11 @@ end %while Iwant(1)~=0
         Iyear=str2num(fnames{JJ}(3:4))-7;
         plot_manual_detection_allDASARs(fnames{JJ},GSI_file_dir,manual_logs.manual_data{Isite,Iyear}.ind,time_zone_offset,head_info,Ibest_this_DASAR(JJ));
 
-        if strcmp(dataset_chc,'manual')
-            imgdata=load(sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)}));
-        else
-            try
-                if strcmp(fnames{(JJ)}(end-4),'0')
-                    load_name=sprintf('%s%s%s',images_dir{1},filesep,fnames{(JJ)});
-                    imgdata=load(load_name);
-                else
-                    load_name=sprintf('%s%s%s',images_dir{2},filesep,fnames{(JJ)});
-                    imgdata=load(load_name);
-                end
-            catch
-                fprintf('%s not in directory...\n',load_name);
-                return
-            end
+        [imgdata,found_file]=load_image_data(dataset_chc,images_dir,fnames{JJ});
+        if ~found_file
+            return
         end
+
 
         imgdata.features.fpeak=imgdata_min_freq+imgdata.features.fpeak;
         subplot(4,2,8)

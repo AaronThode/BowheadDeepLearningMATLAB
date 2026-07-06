@@ -134,7 +134,7 @@ else
         'String',{'<no feature struct>'},'Value',1,'Enable','off');
 end
 % store handle
-sel = fnames{end};
+sel = fnames{Idefault};
 % store the selected field name for other callbacks to use
 
 % Two edit boxes to the right of ddFeature with same callback
