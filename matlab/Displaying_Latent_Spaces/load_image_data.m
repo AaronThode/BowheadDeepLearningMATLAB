@@ -12,9 +12,11 @@ try
         end
     else
         fprintf('%s is not a valid keyword for dataset_chc ...\n',dataset_chc);
+        
     end
 catch
     fprintf('Could not load %s...\n',fname);
     status=false;
+    imgdata=[];
 end
 
