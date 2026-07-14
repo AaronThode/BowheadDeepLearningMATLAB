@@ -49,7 +49,7 @@ else
     pause(0.5)
     %Display manual examples
     hh=ud.ax;
-    hh.Title.String=sprintf('%i originals, %i Samples editable, %i manual, %i auto', ...
+    hh.Title.String=sprintf('%i originals, %i Samples editable, %i annotated, %i unmarked', ...
         N_all_subsamples,length(Icluster),N_manual,N_unmarked);
     hh.Title.FontWeight="bold";
     hh.Title.FontSize=14;

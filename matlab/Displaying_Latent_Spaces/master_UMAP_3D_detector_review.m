@@ -298,7 +298,7 @@ for Idir=1:length(dir_names)
                     xlim([0 1]);ylim([0 1]);
 
                     %%%Estimate precision for realistic data set
-                    R1=sum(Ino_call)/sum(Icall);
+                    R1=sum(Ino_call)/sum(Icall);  %Ratio of false hits to manual count in this dataset.
                     R2=7.8;  %Ratio of false hits to manual count in full dataset
                     precision_estimated=precision.*R1./(R2.*(1-precision)+R1.*precision);
                     subplot(1,2,1)
@@ -314,6 +314,7 @@ for Idir=1:length(dir_names)
                 ud.features.score=score;
                 
                 set(myfig,'UserData',ud);
+                data.features.score=score;
 
 
 
