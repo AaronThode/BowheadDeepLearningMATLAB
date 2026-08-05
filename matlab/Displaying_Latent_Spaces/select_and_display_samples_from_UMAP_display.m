@@ -40,7 +40,7 @@ else
     temp_type=data.features.type(Icluster);  %%Note that edited calls will be used here...
 
     temp_Imanual=find(temp_type>0);
-    temp_Iauto=find(temp_type==0);
+    temp_Iauto=find(temp_type<=0);
 
     N_manual=length(temp_Imanual);
     N_unmarked=length(temp_Iauto);

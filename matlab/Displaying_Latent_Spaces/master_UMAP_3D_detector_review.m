@@ -29,7 +29,7 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 %           ICI:
 %display_call_classifications=false;
 
-dataset_chc='eval';
+dataset_chc='train';
 force_UMAP_recompute=false;
 force_labels_recompute=false;
 ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
@@ -208,6 +208,7 @@ for Idir=1:length(dir_names)
 
     notready=true;
     while notready
+        setpref('Updates','Conversion','ask'); %%Removes 'Do not show again' option...
         [operation_chc,tf] = uigetpref(group,pref,tit,quest,pbtns);
         switch operation_chc
             case 'print'

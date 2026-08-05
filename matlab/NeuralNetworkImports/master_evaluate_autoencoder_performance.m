@@ -5,20 +5,20 @@ clear all
 
 %%%Load data set used to train autoencoder
 train_fname='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software/matlab/Displaying_Latent_Spaces';
-train_fname=[train_fname filesep 'latent_embeddings_3d_auto_MATLAB.mat'];
+train_fname=[train_fname filesep 'latent_embeddings_3d_train_MATLAB.mat'];
 train=load(train_fname);
 
 
 %%%Load test data set latent vectors
 
 test_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Software/matlab/NeuralNetworkImports';
-test_fname=[test_dir filesep 'Evaluation_Detection_Centered_latent_embeddings_3d_auto_MATLAB.mat'];
+test_fname=[test_dir filesep 'latent_embeddings_3d_eval_MATLAB.mat'];
 test=load(test_fname);
 
 disp('Computing nearest neighbor....')
 
 Neighbors=20;  %Found no effect in using 10 or 40.
-
+min_duration=0.5;
 Idx_all=knnsearch(train.latent_embeddings, ...
     test.latent_embeddings,'K',Neighbors,'IncludeTies',true,'Distance','euclidean');
 Nsamples=length(Idx_all);
@@ -31,15 +31,15 @@ for I=1:2  %1 is all samples, 2 is restricted duration
     test.iscall=test.features.type_org>0 & test.features.type_org<12;
     switch I
         case 1
-           Igood=1:Nsamples;
-           Idx=Idx_all;
-           titstr=sprintf('Neighbors: %i, All samples',Neighbors);
-        case 2
-           Igood=find(test.features.duration1>=0.5);
-           Idx=Idx_all(Igood);
-            titstr=sprintf('Neighbors: %i, Samples > 0.5 sec',Neighbors);
-    end
+            Igood=1:Nsamples;
+            Idx=Idx_all;
 
+        case 2
+            Igood=find(test.features.duration1>=min_duration);
+            Idx=Idx_all(Igood);
+            titstr=sprintf('Neighbors: %i, Samples > %3.2f sec',Neighbors,min_duration);
+    end
+    titstr=sprintf('Neighbors: %i',Neighbors);
     score=zeros(length(test.iscall(Igood)),1);  %Score is size of test dataset
     idx_max=0;
     for Iscore=1:length(Idx)
@@ -53,7 +53,8 @@ for I=1:2  %1 is all samples, 2 is restricted duration
 
     total_positives_in_test=sum(Icall);
 
-    recall=zeros(1,length(threshold));precision=recall;
+    recall=zeros(1,length(threshold));
+    precision=recall;
     for Ithresh=1:length(threshold)
         detected_positives=sum(score(Icall)>=threshold(Ithresh));
         false_positives=sum(score(Ino_call)>=threshold(Ithresh));
@@ -67,11 +68,26 @@ for I=1:2  %1 is all samples, 2 is restricted duration
     xlabel('Recall');ylabel('Precision');
     xlim([0 1]);ylim([0 1]);
     title(titstr)
+    if I==2
+        legend('All samples',sprintf('Samples greater than %3.2f seconds',min_duration),'location',' southwest')
+    end
+       text(0.1,0.95,'a)','fontweight','bold','FontSize',14)
+  
+    set(gca,'fontweight','bold','FontSize',14);
+
+
     subplot(1,2,2);hold on
     plot(1-recall,1-precision,[strrr(I) '-o']);grid on;
     xlabel('Miss fraction');ylabel('False discovery rate (Fraction of calls that are not calls)');
     xlim([0 1]);ylim([0 1]);
     title(titstr)
+    if I==2
+        legend('All samples',sprintf('Samples greater than %3.2f seconds',min_duration),'location','northeast')
+    end
+    text(0.05,0.95,'b)','fontweight','bold','FontSize',14)
+    set(gca,'fontweight','bold','FontSize',14);
+
+
     %%%Estimate precision for realistic data set
     % R1=sum(Ino_call)/sum(Icall);
     % R2=7.8;  %Ratio of false hits to manual count in full dataset
@@ -81,10 +97,10 @@ for I=1:2  %1 is all samples, 2 is restricted duration
     % subplot(1,2,2);
     % plot(1-recall,1-precision_estimated,[strr2(I) '-o']);grid on;hold on
 
-disp(sprintf('Dataset length: %i samples (%i calls, %i false)',length(test.iscall(Igood)),sum(Icall),sum(Ino_call)))
-    
+    fprintf('Dataset length: %i samples (%i calls, %i false)\n',length(test.iscall(Igood)),sum(Icall),sum(Ino_call))
+
 end %I
- legend('original','duration restricted');
- 
-               
-print -djpeg -r300 evaluation_result.jpg
+%title(sprintf('%i Neighbors',Neighbors))
+
+orient landscape
+print(sprintf('AE_performance_%i_Neighbors.jpg',Neighbors),'-djpeg','-r300')
