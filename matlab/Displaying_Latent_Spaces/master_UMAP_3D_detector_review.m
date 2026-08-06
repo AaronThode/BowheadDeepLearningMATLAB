@@ -29,10 +29,10 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 %           ICI:
 %display_call_classifications=false;
 
-dataset_chc='train';
+dataset_chc='eval2';
 force_UMAP_recompute=false;
-force_labels_recompute=false;
-ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
+force_labels_recompute=true;
+%ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
 
 %   samples if they were made more recently than this
 %   time
@@ -50,7 +50,6 @@ n_neighbors=15;
 min_dist=0.1;
 save_template=false;
 
-%[Database_dir,procdata_basedir,gitpath] = setUpDatabasePaths;
 
 clear dir_names
 
@@ -63,7 +62,10 @@ switch dataset_chc
     case 'eval'
         dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
         images_dir{1,1}=[image_dir 'Unsupervised_database_Evaluation_200K_8Auto1Manual_ADG_Y08101214_centered_06May2026.dir'];
-      
+    case 'eval2'
+         dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
+        images_dir{1,1}='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/BCB_Whale_Datasets/Eval_200K_Balanced_50pct.dir';
+       
 end
 
 for Idir=1:length(dir_names)
