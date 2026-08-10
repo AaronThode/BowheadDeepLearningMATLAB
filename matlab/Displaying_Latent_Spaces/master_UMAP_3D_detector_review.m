@@ -29,9 +29,9 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 %           ICI:
 %display_call_classifications=false;
 
-dataset_chc='eval2';
+dataset_chc='eval_8to1';
 force_UMAP_recompute=false;
-force_labels_recompute=true;
+force_labels_recompute=false;
 %ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
 
 %   samples if they were made more recently than this
@@ -62,10 +62,14 @@ switch dataset_chc
     case 'eval'
         dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
         images_dir{1,1}=[image_dir 'Unsupervised_database_Evaluation_200K_8Auto1Manual_ADG_Y08101214_centered_06May2026.dir'];
-    case 'eval2'
-         dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
-        images_dir{1,1}='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/BCB_Whale_Datasets/Eval_200K_Balanced_50pct.dir';
-       
+    case 'eval_8to1'
+        dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
+        % images_dir{1,1}='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/BCB_Whale_Datasets/Eval_200K_Balanced_50pct.dir';
+        images_dir{1,1}=[image_dir 'Unsupervised_database_Evaluation_200K_8Auto1Manual_ADG_Y08101214_centered_07Aug2026.dir'];
+    case 'eval_1to1'
+        dir_names={[latent_space_dir filesep 'Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir' filesep]};
+        images_dir{1,1}=[image_dir 'Unsupervised_database_Evaluation_200K_1Auto1Manual_ADG_Y08101214_centered_07Aug2026.dir'];
+
 end
 
 for Idir=1:length(dir_names)
@@ -158,10 +162,10 @@ for Idir=1:length(dir_names)
         data.features=orderfields(data.features,[1:(J_iscall-1) (J_iscall+1):length(fieldname) J_iscall]);
         save(edit_file_name,"-struct","data")
     end  %Advanced labels
-    
+
     data.features.ischanged=(data.features.type~=data.features.type_org);
     data.features.iscall=(data.features.type>0);
-    
+
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);
         %coeff: projection of original axes onto new orthogonal axes (5
@@ -195,11 +199,11 @@ for Idir=1:length(dir_names)
     initial_el=90;
     alpha_value=0.2;
     %create_gif=input('Enter 1 to create a rotating GIF, hit return otherwise...\n');
-     create_gif=[];
-     if ~isempty(create_gif)
-         titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
+    create_gif=[];
+    if ~isempty(create_gif)
+        titstr=sprintf('%s_%s_UMAP%idim.gif',dataset_chc,color_label,UMAP_dim);
         GIF_movie_demo(x_norm,data.features.iscall,alpha_value,titstr,initial_azi,initial_el);
-     end
+    end
 
 
     group = "Updates";
@@ -220,16 +224,16 @@ for Idir=1:length(dir_names)
                 newobj=copyobj(ud.h,ax_print);
 
                 Hax = findobj(myfig,'type','axes');
-                
+
                 set(ax_print,'XLim',Hax.XLim);
                 set(ax_print,'YLim',Hax.YLim);
                 set(ax_print,'ZLim',Hax.ZLim);
-                
+
                 colormap jet; grid on;
-                hh=colorbar; 
+                hh=colorbar;
                 set(hh.Label,"String",ud.selectedFeatureField, "FontSize",12,"FontWeight","bold")
                 clim([ min(ud.CData)  max(ud.CData)]);
-                
+
                 xlabel('UMAP 1');ylabel('UMAP 2');
 
 
@@ -290,7 +294,7 @@ for Idir=1:length(dir_names)
 
                     end
 
-                  
+
                     subplot(1,2,1);hold on
                     plot(recall,precision,[strrr(I) '-o']);grid on;hold on
                     xlabel('Recall');ylabel('Precision');
@@ -308,14 +312,14 @@ for Idir=1:length(dir_names)
                     plot(recall,precision_estimated,[strr2(I) '-o']);
                     subplot(1,2,2);
                     plot(1-recall,1-precision_estimated,[strr2(I) '-o']);grid on;hold on
-                   
+
 
                 end %I
                 legend('original','estimated bulk: original','edited','estimated bulk: edited');
                 title(sprintf('Dataset length: %i samples (%i calls, %i false)',length(Igood),sum(Icall),sum(Ino_call)))
-                
+
                 ud.features.score=score;
-                
+
                 set(myfig,'UserData',ud);
                 data.features.score=score;
 
@@ -326,7 +330,7 @@ for Idir=1:length(dir_names)
                 %save(sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc),"-struct","data");
                 disp(['Saving data to ' edit_file_name]);
                 save(edit_file_name,"-struct","data");
-                
+
             case 'quit'
 
                 %yes=input('Save one final time?','s');

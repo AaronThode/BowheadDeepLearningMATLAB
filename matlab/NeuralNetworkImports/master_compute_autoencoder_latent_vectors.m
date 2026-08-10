@@ -17,7 +17,7 @@
 
 clear all
 close all
-
+addpath ../Displaying_Latent_Spaces
 %%%UMAP parameters
 addpath ../../../umapAndEppFileExchange_v4_6/umap
 UMAP_dim=3;   %Dimension of UMAP to compute
@@ -26,10 +26,10 @@ min_dist=0.1;
 save_template=false;
 
 
-batch_size=500;
+batch_size=2000;
+output_label='eval_1to1';
 network_chc='Evaluation_Detection_Centered';
-image_folder='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Evaluation_200K_8Auto1Manual_ADG_Y08101214_centered_06May2026.dir/';
-
+image_folder='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Evaluation_200K_1Auto1Manual_ADG_Y08101214_centered_07Aug2026.dir/';
 
 
 [net_autoencoder,net_decoder,net_dir,Nlatent]=load_trained_network(network_chc);
@@ -99,7 +99,7 @@ rmpath(net_dir);
 
 
 
-save(sprintf('%s_latent_embeddings_3d_auto_MATLAB.mat',Evaluation_Detection_Centered),'latent_embeddings','features','original_filenames','image_folder','net_dir','umap_embeddings_3d');
+save(sprintf('%s_latent_embeddings_3d_%s_MATLAB.mat',network_chc,output_label),'latent_embeddings','features','original_filenames','image_folder','net_dir','umap_embeddings_3d');
 
 zlimm_want=[-5 5];  %%%Restrict zaxis when selecting samples
 color_label='iscall';  %%How to label colors in 3D scattering plot.
