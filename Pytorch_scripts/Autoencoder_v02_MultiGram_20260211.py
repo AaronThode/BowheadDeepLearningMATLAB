@@ -765,6 +765,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     model_path = os.path.join(output_dir, 'trained_model', 'autoencoder_clean.pth')
     torch.save(model.state_dict(), model_path)
     print(f"Saved model to: {model_path}")
+    
+    # Save as .pt file as well
+    model_path_pt = os.path.join(output_dir, 'trained_model', 'autoencoder_clean.pt')
+    torch.save(model.state_dict(), model_path_pt)
+    print(f"Saved model to: {model_path_pt}")
     sys.stdout.flush()
     
     # Save model weights as MATLAB-compatible .mat file in MATLAB subdirectory
@@ -793,6 +798,11 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     model_120_path = os.path.join(output_dir, 'trained_model', 'autoencoder_120x104.pth')
     torch.save(model_120x104.state_dict(), model_120_path)
     print(f"  ✓ Saved 120x104 model: {model_120_path}")
+    
+    # Save 120x104 as .pt file as well
+    model_120_path_pt = os.path.join(output_dir, 'trained_model', 'autoencoder_120x104.pt')
+    torch.save(model_120x104.state_dict(), model_120_path_pt)
+    print(f"  ✓ Saved 120x104 model: {model_120_path_pt}")
     
     # Save as MATLAB .mat format
     mat_120_path = os.path.join(output_dir, 'MATLAB', 'autoencoder_120x104.mat')
@@ -1035,44 +1045,49 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
     print(f"  -> Mapping {len(filenames)} embeddings to source files")
     print("  -> Use replot_tsne_from_saved.py to re-plot with different k values!")
     
-    # Plot 4: UMAP visualizations (2D, 3D, 5D) - if enabled and available
+    # Plot 4: UMAP visualization (if enabled and available)
     if ENABLE_UMAP and UMAP is not None and improved_latent_full.shape[0] > 2:
         try:
             print(f"Computing UMAP (2D, 3D, 5D) on {improved_latent_full.shape[0]} samples...")
             
             # Use same clusters from t-SNE/k-means if available
             umap_clusters = clusters
-            cmap = plt.cm.get_cmap('tab10', optimal_k)
             
-            # ===== 2D UMAP =====
+            # Common UMAP parameters
+            umap_params = {
+                'random_state': int(seed) if seed else 42,
+                'n_neighbors': 15,
+                'min_dist': 0.1
+            }
+            
+            # Generate 2D UMAP
             print("  Computing 2D UMAP...")
-            umap_reducer_2d = UMAP(n_components=2, random_state=int(seed) if seed else 42, 
-                                   n_neighbors=15, min_dist=0.1)
+            umap_reducer_2d = UMAP(n_components=2, **umap_params)
             umap_emb_2d = umap_reducer_2d.fit_transform(imp_z)
             
             # Generate 2D UMAP plot
+            cmap = plt.cm.get_cmap('tab10', optimal_k)
             plt.figure(figsize=(7, 6))
+            
             for cluster_id in range(optimal_k):
                 mask = umap_clusters == cluster_id
                 color = cmap(cluster_id)
                 plt.scatter(umap_emb_2d[mask, 0], umap_emb_2d[mask, 1], 
                            c=[color], alpha=0.85, s=28, label=f'Cluster {cluster_id}')
             
-            plt.title(f'UMAP 2D Latent Space (k={optimal_k})')
+            plt.title(f'UMAP Latent Space 2D (k={optimal_k})')
             plt.xlabel('UMAP 1')
             plt.ylabel('UMAP 2')
             plt.legend(loc='upper right', fontsize=8, framealpha=0.9, ncol=(2 if optimal_k > 5 else 1))
             plt.figtext(0.99, 0.01, f'Dataset: {dataset_label}', 
                        ha='right', va='bottom', fontsize=7, style='italic', alpha=0.6)
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_2d_latent.png'), dpi=160)
+            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_latent.png'), dpi=160)
             plt.close()
-            print(f"    ✓ 2D UMAP complete")
             
-            # ===== 3D UMAP =====
+            # Generate 3D UMAP
             print("  Computing 3D UMAP...")
-            umap_reducer_3d = UMAP(n_components=3, random_state=int(seed) if seed else 42,
-                                   n_neighbors=15, min_dist=0.1)
+            umap_reducer_3d = UMAP(n_components=3, **umap_params)
             umap_emb_3d = umap_reducer_3d.fit_transform(imp_z)
             
             # Generate 3D UMAP plot
@@ -1084,30 +1099,49 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                 mask = umap_clusters == cluster_id
                 color = cmap(cluster_id)
                 ax.scatter(umap_emb_3d[mask, 0], umap_emb_3d[mask, 1], umap_emb_3d[mask, 2],
-                          c=[color], alpha=0.85, s=28, label=f'Cluster {cluster_id}')
+                          c=[color], alpha=0.7, s=20, label=f'Cluster {cluster_id}')
             
-            ax.set_title(f'UMAP 3D Latent Space (k={optimal_k})')
+            ax.set_title(f'UMAP Latent Space 3D (k={optimal_k})')
             ax.set_xlabel('UMAP 1')
             ax.set_ylabel('UMAP 2')
             ax.set_zlabel('UMAP 3')
             ax.legend(loc='upper right', fontsize=8, framealpha=0.9, ncol=(2 if optimal_k > 5 else 1))
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_3d_latent.png'), dpi=160)
+            plt.savefig(os.path.join(output_dir, 'UMAP', 'umap_latent_3d.png'), dpi=160)
             plt.close()
-            print(f"    ✓ 3D UMAP complete")
             
-            # ===== 5D UMAP =====
+            # Generate 5D UMAP (no visualization)
             print("  Computing 5D UMAP...")
-            umap_reducer_5d = UMAP(n_components=5, random_state=int(seed) if seed else 42,
-                                   n_neighbors=15, min_dist=0.1)
+            umap_reducer_5d = UMAP(n_components=5, **umap_params)
             umap_emb_5d = umap_reducer_5d.fit_transform(imp_z)
-            print(f"    ✓ 5D UMAP complete (no visualization, saved to .mat)")
             
-            # Save ALL UMAP embeddings (2D, 3D, 5D) to single .mat file
-            umap_data = {
+            # Save all UMAP embeddings (2D, 3D, 5D)
+            umap_data_2d = {
                 'latent_embeddings': imp_z,
-                'umap_embeddings_2d': umap_emb_2d,
+                'umap_embeddings': umap_emb_2d,
+                'clusters': umap_clusters,
+                'optimal_k': optimal_k,
+                'dataset_label': dataset_label,
+                'original_filenames': filenames,
+                'reconstruction_filenames': reconstruction_filenames
+            }
+            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings.mat'), umap_data_2d)
+            print(f"  ✓ Saved 2D UMAP to UMAP/umap_embeddings.mat")
+            
+            umap_data_3d = {
+                'latent_embeddings': imp_z,
                 'umap_embeddings_3d': umap_emb_3d,
+                'clusters': umap_clusters,
+                'optimal_k': optimal_k,
+                'dataset_label': dataset_label,
+                'original_filenames': filenames,
+                'reconstruction_filenames': reconstruction_filenames
+            }
+            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings_3d.mat'), umap_data_3d)
+            print(f"  ✓ Saved 3D UMAP to UMAP/umap_embeddings_3d.mat")
+            
+            umap_data_5d = {
+                'latent_embeddings': imp_z,
                 'umap_embeddings_5d': umap_emb_5d,
                 'clusters': umap_clusters,
                 'optimal_k': optimal_k,
@@ -1115,8 +1149,9 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
                 'original_filenames': filenames,
                 'reconstruction_filenames': reconstruction_filenames
             }
-            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings.mat'), umap_data)
-            print(f"✓ Saved UMAP embeddings (2D, 3D, 5D) to UMAP/umap_embeddings.mat")
+            savemat(os.path.join(output_dir, 'UMAP', 'umap_embeddings_5d.mat'), umap_data_5d)
+            print(f"  ✓ Saved 5D UMAP to UMAP/umap_embeddings_5d.mat")
+            print(f"✓ Generated UMAP in 2D, 3D, and 5D dimensions")
             
         except Exception as e:
             print(f"Warning: UMAP visualization skipped: {e}")
@@ -1235,7 +1270,7 @@ def train_autoencoder_from_scratch(data_dir: str, n_samples: int = 15, latent_di
         f"",
         f"Results:",
         f"  Final loss: {losses[-1]:.6f}",
-        f"  Model saved: autoencoder_clean.pth",
+        f"  Model saved: autoencoder_clean.pth, autoencoder_clean.pt",
         f"  FRESH START: Model trained from random initialization",
     ]
     
@@ -1259,8 +1294,8 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", 
                        nargs='+',
                        default=[
-                          "/Users/oboulais/Public/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_Y08101214_centered.dir",
-                          "/Users/oboulais/Public/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_AutoWithAirguns_100K_Y08101214_centered.dir"
+                           "/Users/oboulais/Public/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Auto_100K_ADG_Y08101214_centered_16Apr2026.dir",
+                           "/Users/oboulais/Public/Bowhead_DL_Project/BCB_Whale_Datasets/Unsupervised_database_Manual_100K_ADG_Y08101214_centered_16Apr2026.dir"
                        ],
                        help="One or more directories containing .mat files")
     parser.add_argument("--max-samples-per-dataset", type=int, default=50000,
