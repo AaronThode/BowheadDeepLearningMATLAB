@@ -408,13 +408,14 @@ for Iyear=1:length(year_want)
                         length(Iwhale_match),length(Idet_notWhale),length(Imiss))
 
                     %%%%%%%Create spectrograms of all sounds%%%%%%%
+                    %%% Center it around peak energy
                     %param.spec.debug_plot=false;
                     for Idet=1:length(detect.tstart)
                         if rem(Idet,500)==0, fprintf('%3.2f percent done\n',100*Idet/length(detect.tstart));end
                         %II=Idet_notWhale(Idet);
                         II=(Idet);
                         %tmid=0.5*(detect.tstart(II)+detect.tend(II));
-                        tmid=detect.tpeak(II);
+                        tmid=detect.tpeak(II);  %%%Center spectrogram about detection peak
                         titstr{1}=sprintf('Detection Filename: %s, middle time %6.2f seconds, %i of %i',file_array{Ifile_want},tmid,Idet,length(detect.tstart));
                         titstr{2}=sprintf('Final SNR image, SNR: %6.2f, abs start: %s, score overlap: %6.4f', ...
                             detect.dB_RMS(II),datestr(detect.tstart_abs(II)),Score{Ichunk}(II));

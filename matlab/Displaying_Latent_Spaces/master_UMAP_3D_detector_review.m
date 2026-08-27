@@ -2,7 +2,7 @@
 %master_UMAP_3D_detector_review.m
 
 
-close all
+%close all
 clear all
 
 if ~isdeployed
@@ -13,9 +13,6 @@ end
 
 %addpath .
 
-%%%Data review parameters
-zlimm_want=[-5 5];  %%%Restrict zaxis when selecting samples
-color_label='iscall';  %%How to label colors in 3D scattering plot.
 
 % fpeak:
 %         tpeak:
@@ -29,16 +26,23 @@ color_label='iscall';  %%How to label colors in 3D scattering plot.
 %           ICI:
 %display_call_classifications=false;
 
-dataset_chc='eval_8to1';
-force_UMAP_recompute=false;
-force_labels_recompute=false;
-%ignore_edits_after_this_date=datetime(2026,6,22,17,0,0);
 
-%   samples if they were made more recently than this
-%   time
+dataset_chc='eval_8to1';
+file_template='latent_embeddings_%id_%s_MATLAB_combined.mat';  %i is for UMAP dimension, %s is for dataset_chc
+
+dataset_chc='train';
+file_template='latent_embeddings_%id_%s_MATLAB_Angel_Final_26Aug2026.mat';  %i is for UMAP dimension, %s is for dataset_chc
+
 display_manual=true;  %If true, plot spectrogram images of known manual calls
 display_auto=true;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
+
+force_UMAP_recompute=false;
+force_labels_recompute=false;
+
+%%%Data review parameters
+zlimm_want=[-5 5];  %%%Restrict zaxis when selecting samples
+color_label='iscall';  %%How to label colors in 3D scattering plot.
 
 
 %%%UMAP parameters
@@ -82,7 +86,7 @@ for Idir=1:length(dir_names)
     if  force_UMAP_recompute
         file_want=sprintf('latent_embeddings.mat');
     else
-        file_want=sprintf('latent_embeddings_%id_%s_MATLAB.mat',UMAP_dim,dataset_chc);
+        file_want=sprintf(file_template,UMAP_dim,dataset_chc);
     end
 
     edit_file_name = fullfile([dir_names{Idir} filesep 'MATLAB'], file_want);    % current folder + filename

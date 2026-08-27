@@ -8,7 +8,9 @@ min_duration=0.5;
 
 
 %%%Load data set used to train autoencoder
-train_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Bowhead_DL_Project/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/MATLAB';
+%train_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/Bowhead_DL_Project/LD32/Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir/MATLAB';
+train_dir='/Volumes/Thode_AI_Working_Disk/Bowhead_DL_Project/Networks_And_LatentSpaceRuns.dir/LD32//Autoencoder_v13_100E_32LD_32C_AutoManual_Combined_100K_Date20260416-180022.dir//MATLAB';
+
 train_fname=[train_dir filesep 'latent_embeddings_3d_train_MATLAB_5Aug2026_Angel.mat'];
 train=load(train_fname);
 
@@ -16,7 +18,7 @@ train=load(train_fname);
 %%%Load evaluation data set latent vectors
 
 eval_dir=train_dir;
-eval_fname=[eval_dir filesep 'latent_embeddings_3d_eval_8to1_MATLAB.mat'];
+eval_fname=[eval_dir filesep 'latent_embeddings_3d_eval_8to1_MATLAB_Raquel_21Aug2026_Final_Evaluation.mat'];
 eval=load(eval_fname);
 
 disp('Computing nearest neighbor....')
@@ -106,3 +108,7 @@ end %I
 
 orient landscape
 print(sprintf('AE_performance_%i_Neighbors.jpg',Neighbors),'-djpeg','-r300')
+
+%%%Assign score to evaluation data set as score train
+eval.features.score_train=score{1};
+save(eval_fname,"-struct","eval");
