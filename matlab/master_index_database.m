@@ -17,7 +17,8 @@
 %
 %   Variable formats and organization:
 %       index{Iyear,Isite,Iday,Ifold,I_d_directory};  Note that results NOT
-%               broken down by DASAR
+%               broken down by DASAR;  Ifold is either call detection or
+%               other transient.
 %       file_fraction.manual_all=zeros(Iyear,Isite,Iday,Idasar,I_d_directory);  %Last index is maximum number of 'D' folders expected.
 %       file_fraction.auto_all= file counts including possible airguns
 %       file_fraction.auto_noairgun= file counts after possible airgun

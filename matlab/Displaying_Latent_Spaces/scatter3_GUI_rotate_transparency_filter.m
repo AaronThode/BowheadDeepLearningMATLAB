@@ -6,10 +6,16 @@ function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,
 % and edit boxes for Azimuth and Elevation
 % Alpha (transparency) slider + edit
 
+if exist('features','var') && isstruct(features)
+    fnames = fieldnames(features);
+else
+    fnames = {};
+end
 
+Idefault=find(contains(fnames,'iscall'));
 
-feature_names=fieldnames(features);
-type=features.(feature_names{end});
+%feature_names=fieldnames(features);
+type=features.(fnames{Idefault});
 Igood=1:size(X0,1);
 
 if ~exist("default_view","var")
@@ -104,13 +110,7 @@ edtAlpha = uicontrol(fig,'Style','edit','Position',[x0+w-90 y-22 editW 22],'Stri
 % Dropdown: feature field names from 'feature' struct (or variable)
 % Determine field names safely
 y = y - gap; % position above other controls
-if exist('features','var') && isstruct(features)
-    fnames = fieldnames(features);
-else
-    fnames = {};
-end
 
-Idefault=find(contains(fnames,'iscall'));
 
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Feature Color','HorizontalAlignment','left');
 if ~isempty(fnames)

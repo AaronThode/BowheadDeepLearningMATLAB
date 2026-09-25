@@ -30,8 +30,8 @@ end
 dataset_chc='eval_8to1';
 file_template='latent_embeddings_%id_%s_MATLAB_combined.mat';  %i is for UMAP dimension, %s is for dataset_chc
 
-dataset_chc='train';
-file_template='latent_embeddings_%id_%s_MATLAB_Angel_Final_26Aug2026.mat';  %i is for UMAP dimension, %s is for dataset_chc
+%dataset_chc='train';
+%file_template='latent_embeddings_%id_%s_MATLAB_Angel_Final_26Aug2026.mat';  %i is for UMAP dimension, %s is for dataset_chc
 
 display_manual=true;  %If true, plot spectrogram images of known manual calls
 display_auto=true;  %If true, plot spectrogram images of known manual calls
@@ -169,6 +169,8 @@ for Idir=1:length(dir_names)
 
     data.features.ischanged=(data.features.type~=data.features.type_org);
     data.features.iscall=(data.features.type>0);
+%data.features.iscall=(data.features.type_org>0);
+%disp('Warning, iscall being shown for original labels, not edited...')
 
     if UMAP_dim==5
         [coeff,score,latent,tsquared,explained] = pca(x,'NumComponents',3);

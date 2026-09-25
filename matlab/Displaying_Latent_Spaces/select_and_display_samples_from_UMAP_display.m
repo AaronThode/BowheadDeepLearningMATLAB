@@ -108,6 +108,8 @@ else
     %%%Change type, iscall, and ischanged features
     ud.features.type=data.features.type;
     data.features.iscall=double(data.features.type>0);
+    %data.features.iscall=double(data.features.type_org>0);
+    %disp('WARNING!  iscall shown for original labels, not edited')
     ud.features.iscall=data.features.iscall;
 
     data.features.ischanged=(data.features.type~=data.features.type_org);
@@ -117,11 +119,7 @@ else
     figure(myfig);
     set(myfig,'UserData',ud);
 
-    %  if strcmpi(ud.selectedFeatureField,'iscall')
-    %     Igood=find(ud.features.iscall>0);
-    %     ud.Igood=Igood;
-    %     data.Igood=Igood;
-    %     set(myfig,'UserData',ud);
+   
 
     %%%Update the internal 'Igood' variable stored in UserData.
 
