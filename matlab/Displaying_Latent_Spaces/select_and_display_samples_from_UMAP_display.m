@@ -10,6 +10,9 @@ if (length(Igood)~=length(ud.h.CData)) | (length(Igood) ~= length(ud.h.XData))
     keyboard
 end
 
+
+%%%Select points on screen to edit
+
 tmp=ginput(2);
 tmp(:,3)=str2num(ud.edtZ.String)';
 Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
@@ -31,8 +34,10 @@ I_old_enough=find(data.date_adjusted(Icluster)<ignore_edits_after_this_date);  %
 
 Icluster=Icluster(I_old_enough);  %Index now relates fo full data set
 
+max_samples.unmarked=90;
+max_samples.manual=90;
 if isempty(Icluster)
-    disp('No points available because either none are there, or already edited.');
+    disp('No points available because either none are there, or already edited.');    
 
 else
 
@@ -45,7 +50,15 @@ else
     N_manual=length(temp_Imanual);
     N_unmarked=length(temp_Iauto);
     fprintf('Out of %i original detections %i are editable... \n\t Of those remaining there are %i manual calls and %i unmarked signals in this sample \n', ...
-        N_all_subsamples,length(Icluster),N_manual,N_unmarked);
+        N_all_subsamples,length(Icluster), ...
+        ...
+        ...
+        N_manual,N_unmarked);
+
+    if  N_unmarked> max_samples.unmarked
+        fprintf('More than %i unmarked samples or %i manual calls, aborting your selection...\n',max_samples.unmarked,max_samples.manual);
+        return
+    end
     pause(0.5)
     %Display manual examples
     hh=ud.ax;

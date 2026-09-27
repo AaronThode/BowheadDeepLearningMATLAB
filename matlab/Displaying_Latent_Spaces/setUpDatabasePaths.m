@@ -147,8 +147,8 @@ switch hostname(1:end-1)
                 if exist('/Volumes/Bowhead_DL_Project/','dir')==7
                     image_dir='/Volumes/Bowhead_DL_Project/BCB_Whale_Datasets/';
                 else
-                    disp('WARNING!  CANNOT DISPLAY IMAGES....')
-
+                    %disp('WARNING!  CANNOT DISPLAY IMAGES....')
+                    image_dir='/Users/thode/Projects/Greeneridge_bowhead_detection/DeepLearningNPRB_Project/BCB_Whale_Datasets/';
                 end
             end
             success=true;

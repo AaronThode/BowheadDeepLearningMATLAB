@@ -33,7 +33,7 @@ file_template='latent_embeddings_%id_%s_MATLAB_combined.mat';  %i is for UMAP di
 %dataset_chc='train';
 %file_template='latent_embeddings_%id_%s_MATLAB_Angel_Final_26Aug2026.mat';  %i is for UMAP dimension, %s is for dataset_chc
 
-display_manual=true;  %If true, plot spectrogram images of known manual calls
+display_manual=false;  %If true, plot spectrogram images of known manual calls
 display_auto=true;  %If true, plot spectrogram images of known manual calls
 display_NTV=false;
 
@@ -43,8 +43,8 @@ force_labels_recompute=false;
 %%%Data review parameters
 zlimm_want=[-5 5];  %%%Restrict zaxis when selecting samples
 color_label='iscall';  %%How to label colors in 3D scattering plot.
-
-
+edit_time=datetime(2026,9,27,8,55,0,'Format','yyyy-MM-dd HH:mm:ss');
+%edit_time=datetime('now'); %Use for unrestricted editing
 %%%UMAP parameters
 %addpath ../../../umapAndEppFileExchange_v4_6/umap
 addpath(['..' filesep '..' filesep '..' filesep 'umapAndEppFileExchange_v4_6' filesep 'umap' filesep]);
@@ -196,7 +196,7 @@ for Idir=1:length(dir_names)
 
     %%%Optional flip to try to get better view of data...
     x_norm=-x_norm;
-    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,[60 -36],zlimm_want); colormap jet
+    myfig=scatter3_GUI_rotate_transparency_filter(x_norm,data.features,edit_time,[60 -36],zlimm_want); colormap jet
 
     disp('Select rotation check and rotate figure');
     drawnow;

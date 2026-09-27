@@ -1,7 +1,7 @@
 
 
 
-function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,default_view,zlimm_want)
+function [fig]=scatter3_GUI_rotate_transparency_filter(X0,features,edit_time,default_view,zlimm_want)
 % Scatter3 with independent X,Y,Z sliders + edit boxes for axis limits
 % and edit boxes for Azimuth and Elevation
 % Alpha (transparency) slider + edit
@@ -57,9 +57,9 @@ elseif contains(user_name,'raquel')
     x0=x0-500;
 end
 
-% Add an edit box displaying current date and time
+% Add an edit box displaying a targer date and time
 y = y + gap;
-dtstr = datestr(datetime('now'),'yyyy-mm-dd HH:MM:SS');
+dtstr = string(edit_time);
 uicontrol(fig,'Style','text','Position',[x0 y w htxt],'String','Freeze edits after','HorizontalAlignment','left');
 edt_time=uicontrol(fig,'Style','edit','Position',[x0+110 y 190 24],...
     'String',dtstr,'Enable','on','BackgroundColor',[1 1 1]);
