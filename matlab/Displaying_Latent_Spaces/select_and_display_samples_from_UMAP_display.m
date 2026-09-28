@@ -34,7 +34,7 @@ I_old_enough=find(data.date_adjusted(Icluster)<ignore_edits_after_this_date);  %
 
 Icluster=Icluster(I_old_enough);  %Index now relates fo full data set
 
-max_samples.unmarked=90;
+max_samples.unmarked=120;
 max_samples.manual=90;
 if isempty(Icluster)
     disp('No points available because either none are there, or already edited.');    

@@ -263,8 +263,12 @@ while Iwant(1)~=0
         call_review = inputdlg(prompt,dlgtitle,fieldsize,definput,opts_view_other_window);
         Iwant=str2num(call_review{1});
         if isempty(Iwant),disp('Bad input! Redo');end
+      
     end
 
+    if max(Iwant)>length(Iindex)
+        Iwant(Iwant>length(Iindex))=[];
+    end
     %%%%%Review manual DASARs near a detection if desired
     Ilink=str2double(call_review{4});
     if Ilink>0  %If user has selected something
