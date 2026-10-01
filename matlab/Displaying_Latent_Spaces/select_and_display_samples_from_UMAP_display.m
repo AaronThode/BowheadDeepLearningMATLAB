@@ -21,7 +21,10 @@ Icluster=find(Xt(Igood,1)>min(tmp(:,1))&Xt(Igood,1)<max(tmp(:,1)) ...
 
 Icluster=Igood(Icluster);  %Index now relates fo full data set
 
-%%%Don''t count recent edits...
+%%%%%%%%%%%%%%%
+%%%Don't count recent edits...
+%%%%%%%%%%%%%%%%%%%%%
+
 N_all_subsamples=length(Icluster);
 try
     ignore_edits_after_this_date=datetime(ud.edt_time.String);
@@ -52,12 +55,18 @@ else
     fprintf('Out of %i original detections %i are editable... \n\t Of those remaining there are %i manual calls and %i unmarked signals in this sample \n', ...
         N_all_subsamples,length(Icluster), ...
         ...
-        ...
         N_manual,N_unmarked);
 
+    if  N_manual> max_samples.manual
+        fprintf('More than %i unmarked samples or %i manual calls, making random selection...\n',max_samples.unmarked,max_samples.manual);
+        temp_Imanual=temp_Imanual(randperm(N_manual,max_samples.manual));
+        N_manual=max_samples.manual;
+    end
+
     if  N_unmarked> max_samples.unmarked
-        fprintf('More than %i unmarked samples or %i manual calls, aborting your selection...\n',max_samples.unmarked,max_samples.manual);
-        return
+        fprintf('More than %i unmarked samples or %i manual calls, making random selection...\n',max_samples.unmarked,max_samples.manual);
+        temp_Iauto=temp_Iauto(randperm(N_unmarked,max_samples.unmarked));
+        N_unmarked=max_samples.unmarked;
     end
     pause(0.5)
     %Display manual examples
@@ -100,10 +109,10 @@ else
     if N_manual+N_unmarked==0
         Ireviewed=[];
 
-    elseif N_manual==0
+    elseif N_manual==0 || ~display_manual
         Ireviewed=Icluster(temp_Iauto);
 
-    elseif N_unmarked==0
+    elseif N_unmarked==0 || ~display_auto
         Ireviewed=Icluster(temp_Imanual);
     else
 
@@ -142,7 +151,21 @@ else
     %%%Update info on edited samples
     former_manual=(data.features.type_org>0 & ~data.features.iscall);
     former_auto=(data.features.type_org==0 & data.features.iscall);
-    fprintf('Call samples removed: %i, Call samples added: %i, total changes: %i\n\n', ...
+
+    N_reviewed_now=sum((data.date_adjusted(Ireviewed)>ignore_edits_after_this_date)&(data.features.type(Ireviewed)==-4)&data.features.ischanged(Ireviewed));
+    fprintf('You have changed the classification to -4 of %i out of %i samples for this round of review...\n', ...
+       N_reviewed_now , length(Ireviewed));
+        
+    N_reviewed_total=sum(data.date_adjusted>ignore_edits_after_this_date);  
+    N_changed_during_session=sum((data.features.type_org~=data.features.type) & (data.features.type==-4)& (data.date_adjusted>ignore_edits_after_this_date));
+    
+     fprintf('Total call samples removed: %i, Total call samples added: %i, total changes: %i\n\n', ...
         sum(former_manual),sum(former_auto),sum(data.features.type~=data.features.type_org));
 
+    fprintf('Since session start on %s you have changed %i from CD to ''multiple calls''(-4), out of a total of %i reviews (%3.1f percent)...\n\n',ignore_edits_after_this_date,   ...
+        N_changed_during_session, N_reviewed_total,100*N_changed_during_session/N_reviewed_total);
+    
+
+
+    
 end

@@ -33,7 +33,7 @@ type_chc={'type_org','type'};
 figure;
 
 Ictr=0;
-for Itype=1:2
+for Itype=1:2 %raw vs edited
     for Iduration=1:2  %1 is all samples, 2 is restricted duration
         %train.iscall=train.features.type_org>0 & train.features.type_org<12;
         %eval.iscall=eval.features.type_org>0 & eval.features.type_org<12;
@@ -63,18 +63,35 @@ for Itype=1:2
         Icall=eval.iscall(Igood)>0;
         Ino_call=(eval.iscall(Igood)==0);
 
-        total_positives_in_test=sum(Icall);
-
+       
         recall=zeros(1,length(threshold));
         precision=recall;
+
+        a=1-0.086;  %%%Fraction of CDs that are single CDs
+        %a=1;
         for Ithresh=1:length(threshold)
+            total_calls_in_test=sum(Icall);
+
             detected_positives=sum(score{Iduration}(Icall)>=threshold(Ithresh));
             false_positives=sum(score{Iduration}(Ino_call)>=threshold(Ithresh));
-            recall(Ithresh)=detected_positives./total_positives_in_test;
-            precision(Ithresh)=detected_positives./(detected_positives+false_positives);
 
+            if Itype==2
+                total_calls_in_test=total_calls_in_test-(1-a)*detected_positives;
+                false_positives=false_positives+(1-a)*detected_positives;
+                detected_positives=a*detected_positives;
+            end
+
+            recall(Ithresh)=detected_positives./total_calls_in_test;
+            precision(Ithresh)=detected_positives./(detected_positives+false_positives);
+            
+            if any(isnan(recall) | isnan(precision))
+                keyboard
+            end
         end
 
+        if Itype==2
+            keyboard
+        end
         subplot(1,2,1);hold on
 
 
@@ -90,6 +107,8 @@ for Itype=1:2
         colormap(cmap);
         xlabel('Recall');ylabel('Precision');
         xlim([0 1]);ylim([0 1]);
+        xticks(0:0.1:1)
+
         cb = colorbar('Ticks',linspace(0,1,5),'TickLabels',num2str(round(interp1(linspace(0,1,length(threshold)),threshold,linspace(0,1,5))',3)));
         title(cb,'Threshold');
 
@@ -109,10 +128,21 @@ for Itype=1:2
             plot(1-recall(Iplot),1-precision(Iplot),[strr1(Iduration) strr3(Itype)], ...
                 'Color',cmap(Iplot,:),'MarkerSize',5,'MarkerFaceColor',cmap(Iplot,:));hold on
         end
+
+        %%%%For edited datasets, estimate effect of CDs being assigned to
+        %%%%multiple call categories.
+         % if Itype==2
+        %     Ictr=Ictr+1;
+        %     precision_prime=a.*precision;
+        %     recall_prime=a./(a+((1./recall)-1));
+        %     hr(Ictr)=plot(1-recall_prime,1-precision_prime,[strr1(Iduration) strr2(Itype)],'LineWidth',2);grid on;hold on
+        % 
+        % end
         colormap(cmap);
 
         xlabel('Miss fraction');ylabel('False discovery rate (Fraction of calls that are not calls)');
         xlim([0 1]);ylim([0 1]);
+       
          cb = colorbar('Ticks',linspace(0,1,5),'TickLabels',num2str(round(interp1(linspace(0,1,length(threshold)),threshold,linspace(0,1,5))',3)));
         title(cb,'Threshold');
 
@@ -126,6 +156,7 @@ for Itype=1:2
             text(1e-4,0.95,'b)','fontweight','bold','FontSize',14)
             xscale log
         else
+            xticks(0:0.1:1)
             text(0.05,0.95,'b)','fontweight','bold','FontSize',14)
 
         end

@@ -231,12 +231,12 @@ end %JJ
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %prompt = {'Enter indicies to change [val] or [val1 val2] or val1:val2', ...
-    % 'New type [11 is unknown call type\n, -3 if uncertain is call, -2 if call+airgun, -1 if multiple signals:', ...
+    % 'New type [11 is unknown call type\n, , -4 if multiple whale calls in a CD, -3 if uncertain is call, -2 if call+airgun, -1 if multiple signals:', ...
     % 'Enter an index to play sound...', ...
     % 'Enter an index to review linked DASARs..'};
 
 prompt = {'Enter indicies to change, [val] or [val1 val2] or val1:val2, zero to exit', ...
-    'New type [-10: single airgun or ship, -3: Uncertain if whale, -2: call+airgun, -1: multiple signals, 11: whale call', ...
+    'New type [-10: single airgun or ship, -4 if multiple whale calls, -3: Uncertain if whale, -2: call+airgun, -1: multiple signals, 11: whale call', ...
     'Enter an index to play sound...', ...
     'Enter an index to review linked DASARs..'};
 dlgtitle = 'Input';
@@ -244,9 +244,9 @@ fieldsize = [1 45; 1 45; 1 30; 1 30];
 if strcmpi(FigureName,'manual')
     %  Ndefault=min([30 Nsamples]);
     Ndefault=Nsamples;
-    definput = {sprintf('1:%i',Ndefault),'-2','-1','-1'};  %Turning whale call into call+airgun
+    definput = {sprintf('1:%i',Ndefault),'-4','-1','-1'};  %Turning whale call into multiple whale calls
 else
-    definput = {'0','11','-1','-1'};  %Switching automated detection to unknown call
+    definput = {'0','11','-1','-1'};  %Switching OT to unknown call
 
 end
 opts_view_other_window.WindowStyle='normal';

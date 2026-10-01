@@ -17,7 +17,6 @@ Nother=Ntotal-Ncall;
 fprintf('In revised dataset are %i calls and %i other...\n',Ncall,Nother);
 
 
-
 fprintf('%s has reviewed %i out ot %i total samples.\n',reviewer,sum(contains(data.reviewer,reviewer)),length(data.reviewer));
 
 Nchanged=sum(data.features.type~=data.features.type_org);
@@ -25,8 +24,8 @@ fprintf('%i Samples have been changed.\n',Nchanged)
 
 
 %%%What whale calls have been reclassified as other?
-Category=[0 1 2 3 10];
-Cat_name={'No signal','Multiple Signals','Airgun+Call','Uncertain','Man-made (airgun or vessel}'};
+Category=[0 1 2 3 4 10];
+Cat_name={'No signal','Multiple Signals','Airgun+Call','Uncertain','Multiple whale calls', 'Man-made (airgun or vessel}'};
 %Ncat=[Nother Nother Nother Nother Ncall Nother];
 
 for I=1:length(Category)
